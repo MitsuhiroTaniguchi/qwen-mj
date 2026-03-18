@@ -19,6 +19,15 @@ dev = [
 rules = [
   "pymahjong @ git+https://github.com/MitsuhiroTaniguchi/pymahjong",
 ]
+training = [
+  "unsloth",
+  "trl",
+  "datasets",
+  "accelerate",
+  "peft",
+  "transformers",
+  "torch",
+]
 
 [project.scripts]
 qwen-mj = "qwen_mj.cli:main"

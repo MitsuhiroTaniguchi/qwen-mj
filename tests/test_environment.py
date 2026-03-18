@@ -4,6 +4,7 @@ from qwen_mj import Action, ActionKind, MahjongMatchEnv, MahjongSelfPlayEnv
 from qwen_mj import FirstLegalPolicy, JsonlRolloutLogger, ObservationEncoder, play_hand, play_match
 from qwen_mj import evaluate_against_baseline, run_self_play_experiment
 from qwen_mj import PromptBuilder, SYSTEM_PROMPT, example_to_dict, write_sft_jsonl
+from qwen_mj import example_to_training_text, load_sft_examples
 from qwen_mj.environment import TableState
 from qwen_mj.match import MatchState
 from qwen_mj.types import Phase, PlayerState, TileInstance
@@ -350,3 +351,38 @@ def test_prompt_builder_and_dataset_writer(tmp_path):
     assert len(lines) == 1
     assert payload["completion"].startswith("DISCARD ")
     assert payload["messages"][0]["role"] == "system"
+
+
+def test_sft_example_loader_and_training_text(tmp_path):
+    path = tmp_path / "sft.jsonl"
+    path.write_text(
+        json.dumps(
+            {
+                "messages": [
+                    {"role": "system", "content": "sys"},
+                    {"role": "user", "content": "usr"},
+                ],
+                "completion": "DISCARD 1m",
+            },
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    examples = load_sft_examples(path)
+
+    class _Tokenizer:
+        eos_token = "<eos>"
+
+        def apply_chat_template(self, messages, tokenize=False, add_generation_prompt=False):
+            assert tokenize is False
+            assert add_generation_prompt is False
+            return "|".join(f"{message['role']}:{message['content']}" for message in messages)
+
+    text = example_to_training_text(examples[0], _Tokenizer())
+
+    assert len(examples) == 1
+    assert examples[0]["completion"] == "DISCARD 1m"
+    assert text.endswith("<eos>")
+    assert "assistant:DISCARD 1m" in text

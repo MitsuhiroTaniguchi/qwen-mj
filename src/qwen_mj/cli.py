@@ -11,6 +11,7 @@ from .rollout import FirstLegalPolicy, JsonlRolloutLogger, RandomPolicy, play_ha
 from .environment import MahjongSelfPlayEnv
 from .match import MahjongMatchEnv
 from .training_data import write_sft_jsonl
+from .train_sft import SFTTrainConfig, train_sft
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -44,6 +45,24 @@ def build_parser() -> argparse.ArgumentParser:
     dataset_parser.add_argument("--max-steps", type=int, default=10000)
     dataset_parser.add_argument("--policy", choices=["first-legal", "random"], default="first-legal")
     dataset_parser.add_argument("--output", type=Path, required=True)
+
+    train_parser = subparsers.add_parser("train-sft", help="fine-tune a Qwen model with Unsloth")
+    train_parser.add_argument("--dataset", type=Path, required=True)
+    train_parser.add_argument("--output-dir", type=Path, required=True)
+    train_parser.add_argument("--model-name", default="Qwen/Qwen3.5-4B-Instruct")
+    train_parser.add_argument("--max-seq-length", type=int, default=4096)
+    train_parser.add_argument("--max-steps", type=int, default=1000)
+    train_parser.add_argument("--batch-size", type=int, default=1)
+    train_parser.add_argument("--grad-accumulation", type=int, default=4)
+    train_parser.add_argument("--learning-rate", type=float, default=2e-4)
+    train_parser.add_argument("--warmup-steps", type=int, default=50)
+    train_parser.add_argument("--logging-steps", type=int, default=10)
+    train_parser.add_argument("--save-steps", type=int, default=200)
+    train_parser.add_argument("--seed", type=int, default=0)
+    train_parser.add_argument("--lora-r", type=int, default=16)
+    train_parser.add_argument("--lora-alpha", type=int, default=16)
+    train_parser.add_argument("--lora-dropout", type=float, default=0.0)
+    train_parser.add_argument("--save-method", choices=["lora", "merged_16bit"], default="lora")
 
     return parser
 
@@ -115,6 +134,29 @@ def main(argv: list[str] | None = None) -> int:
             output_records.extend(result["records"])
         count = write_sft_jsonl(output_records, args.output)
         print(json.dumps({"records_written": count, "output": str(args.output)}, ensure_ascii=False, indent=2, sort_keys=True))
+        return 0
+
+    if args.command == "train-sft":
+        config = SFTTrainConfig(
+            dataset_path=args.dataset,
+            output_dir=args.output_dir,
+            model_name=args.model_name,
+            max_seq_length=args.max_seq_length,
+            max_steps=args.max_steps,
+            per_device_train_batch_size=args.batch_size,
+            gradient_accumulation_steps=args.grad_accumulation,
+            learning_rate=args.learning_rate,
+            warmup_steps=args.warmup_steps,
+            logging_steps=args.logging_steps,
+            save_steps=args.save_steps,
+            seed=args.seed,
+            lora_r=args.lora_r,
+            lora_alpha=args.lora_alpha,
+            lora_dropout=args.lora_dropout,
+            save_method=args.save_method,
+        )
+        summary = train_sft(config)
+        print(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True))
         return 0
 
     raise ValueError(f"unknown command: {args.command}")

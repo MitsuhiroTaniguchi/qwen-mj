@@ -25,6 +25,22 @@ pip install -r requirements-dev.txt
 ```
 
 `pymahjong` を使うルール検証まで入れる場合は、`requirements-rules.txt` を追加で入れる。
+Unsloth で学習まで回す場合は、`requirements-training.txt` を追加で入れる。
+`pip install -e .[training]` でも学習用依存を入れられる。
+
+## 学習
+
+SFT データを作る:
+
+```bash
+qwen-mj dataset --mode match --episodes 100 --output data/sft.jsonl
+```
+
+Unsloth で SFT を回す:
+
+```bash
+qwen-mj train-sft --dataset data/sft.jsonl --output-dir runs/sft
+```
 
 ## テスト方針
 

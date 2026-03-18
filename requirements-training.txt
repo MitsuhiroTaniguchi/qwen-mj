@@ -1,0 +1,7 @@
+unsloth
+trl
+datasets
+accelerate
+peft
+transformers
+torch
