@@ -38,7 +38,8 @@ class MahjongMatchEnv:
         self._seed = seed
         self.hand_env = MahjongSelfPlayEnv(rules=self.rules, seed=seed)
         self.state = MatchState(max_round_wind=max_round_wind)
-        self.history: list[Transition] = self.hand_env.history
+        self.history: list[Transition] = []
+        self.hand_history: list[Transition] = self.hand_env.history
         self._last_hand_result: StepResult | None = None
 
     def reset(
@@ -70,7 +71,8 @@ class MahjongMatchEnv:
             honba=honba,
             riichi_sticks=riichi_sticks,
         )
-        self.history = self.hand_env.history
+        self.hand_history = self.hand_env.history
+        self.history.clear()
         self._last_hand_result = None
         return self.observe()
 
@@ -105,6 +107,7 @@ class MahjongMatchEnv:
         self.state.phase = self.hand_env.state.phase
         self.state.terminated = self.hand_env.state.terminated
         self.state.truncated = self.hand_env.state.truncated
+        self.history.append(self.hand_env.history[-1])
         self._last_hand_result = result if (result.terminated or result.truncated) else None
         return result
 
@@ -138,6 +141,9 @@ class MahjongMatchEnv:
             self.state.phase = Phase.GAME_END
             self.state.terminated = True
             self.state.truncated = False
+            self.hand_env.state.phase = Phase.GAME_END
+            self.hand_env.state.terminated = True
+            self.hand_env.state.truncated = False
             return self.observe()
 
         next_scores = list(self.state.scores)
@@ -159,7 +165,7 @@ class MahjongMatchEnv:
             honba=next_honba,
             riichi_sticks=next_riichi_sticks,
         )
-        self.history = self.hand_env.history
+        self.hand_history = self.hand_env.history
         self._last_hand_result = None
         return self.observe()
 

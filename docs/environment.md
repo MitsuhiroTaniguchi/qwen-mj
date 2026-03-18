@@ -37,6 +37,8 @@ This repository builds a Tenhou-rule self-play environment for Qwen3.5-4B.
 - Win settlement with fu/fan-based scoring, honba, and riichi stick payout.
 - Exhaustive draw settlement for tenpai / noten payment.
 - Match wrapper for dealer rotation, honba carryover, and round-wind advancement.
+- Observation encoder for numeric tensors and deterministic text views.
+- JSONL rollout writer and simple baseline policies for data generation.
 - Regression tests for reset, discard progression, and a known winning hand.
 
 ## Conservative Areas

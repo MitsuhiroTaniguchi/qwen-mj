@@ -1,4 +1,7 @@
+import json
+
 from qwen_mj import Action, ActionKind, MahjongMatchEnv, MahjongSelfPlayEnv
+from qwen_mj import FirstLegalPolicy, JsonlRolloutLogger, ObservationEncoder, play_hand, play_match
 from qwen_mj.environment import TableState
 from qwen_mj.match import MatchState
 from qwen_mj.types import Phase, PlayerState, TileInstance
@@ -259,3 +262,52 @@ def test_match_keeps_dealer_and_honba_after_dealer_tsumo():
     assert next_observation["match"]["honba"] == 1
     assert next_observation["match"]["hand_index"] == 1
     assert next_observation["match"]["scores"] == [36700, 21100, 21100, 21100]
+
+
+def test_observation_encoder_produces_stable_shapes():
+    env = MahjongSelfPlayEnv(seed=0)
+    observation = env.reset()
+    encoder = ObservationEncoder()
+
+    encoded = encoder.encode(observation)
+    text = encoder.render_text(observation, env.legal_actions())
+
+    assert encoded["self_hand_counts"].shape == (34,)
+    assert encoded["scores"].shape == (4,)
+    assert encoded["hand_sizes"].shape == (4,)
+    assert encoded["table"].shape == (8,)
+    assert encoded["phase"].shape == (1,)
+    assert "phase=self_decision" in text
+    assert "legal_actions=" in encoder.encode_with_text(observation, env.legal_actions()).text
+
+
+def test_jsonl_rollout_logger_writes_records(tmp_path):
+    env = MahjongSelfPlayEnv(seed=0)
+    encoder = ObservationEncoder()
+    path = tmp_path / "rollout.jsonl"
+
+    with JsonlRolloutLogger(path) as logger:
+        result = play_hand(env, FirstLegalPolicy(), reset_kwargs={"seed": 0}, logger=logger, encoder=encoder, max_steps=1)
+
+    lines = path.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 1
+    record = json.loads(lines[0])
+    assert record["episode_id"] == 0
+    assert record["step_index"] == 0
+    assert record["action"]["kind"] == "discard"
+    assert "encoded" in record
+    assert "text" in record
+    assert result["records"]
+
+
+def test_play_match_returns_match_observation(tmp_path):
+    env = MahjongMatchEnv(seed=0, max_round_wind=1)
+    encoder = ObservationEncoder()
+    path = tmp_path / "match_rollout.jsonl"
+
+    with JsonlRolloutLogger(path) as logger:
+        result = play_match(env, FirstLegalPolicy(), reset_kwargs={"seed": 0}, logger=logger, encoder=encoder, max_steps=1)
+
+    assert "match" in result["final_observation"]
+    lines = path.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 1
