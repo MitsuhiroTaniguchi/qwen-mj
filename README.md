@@ -50,6 +50,12 @@ qwen-mj validate-dataset --dataset data/sft.jsonl
 
 推論は `qwen_mj.select_action(...)` または `qwen_mj.completion_to_action(...)` を使う。
 
+学習済みモデルで self-play を回す:
+
+```bash
+qwen-mj play-model --mode match --model-path runs/sft/merged
+```
+
 ## テスト方針
 
 - まず壊れ方をテストで固定する

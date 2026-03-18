@@ -7,6 +7,7 @@ from qwen_mj import PromptBuilder, SYSTEM_PROMPT, example_to_dict, write_sft_jso
 from qwen_mj import example_to_training_text, load_sft_examples
 from qwen_mj import completion_to_action, normalize_completion
 from qwen_mj import validate_sft_example, validate_sft_jsonl
+from qwen_mj import InferenceConfig, ModelPolicy, select_action
 from qwen_mj.environment import TableState
 from qwen_mj.match import MatchState
 from qwen_mj.types import Phase, PlayerState, TileInstance
@@ -430,6 +431,19 @@ def test_sft_dataset_validator(tmp_path):
     assert invalid_report.errors
 
 
+def test_play_model_help():
+    import subprocess
+
+    completed = subprocess.run(
+        [".venv/bin/python", "-m", "qwen_mj.cli", "play-model", "--help"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "play-model" in completed.stdout
+
+
 def test_completion_to_action_round_trips_legal_action():
     env = MahjongSelfPlayEnv(seed=0)
     observation = env.reset()
@@ -441,3 +455,53 @@ def test_completion_to_action_round_trips_legal_action():
 
     assert normalize_completion(completion) == PromptBuilder().codec.encode(action)
     assert parsed.kind == ActionKind.DISCARD
+
+
+def test_model_policy_selects_canonical_action():
+    env = MahjongSelfPlayEnv(seed=0)
+    observation = env.reset()
+    legal_actions = env.legal_actions()
+    action = next(item for item in legal_actions if item.kind == ActionKind.DISCARD)
+    completion = PromptBuilder().codec.encode(action)
+
+    class _Inputs:
+        def __init__(self, size: int):
+            self.shape = (1, size)
+
+        def to(self, device):
+            return self
+
+    class _Tokenizer:
+        eos_token = None
+
+        def apply_chat_template(self, messages, tokenize=False, add_generation_prompt=False, return_tensors=None):
+            assert tokenize is True
+            assert add_generation_prompt is True
+            assert return_tensors == "pt"
+            return _Inputs(8)
+
+        def decode(self, tokens, skip_special_tokens=True):
+            return completion
+
+    class _Model:
+        device = "cpu"
+
+        def generate(self, inputs, max_new_tokens, do_sample, **kwargs):
+            assert max_new_tokens == 32
+            assert do_sample is False
+            return [[0] * 8 + [1, 2, 3]]
+
+    policy = ModelPolicy(model=_Model(), tokenizer=_Tokenizer(), config=InferenceConfig(model_path="dummy"))
+
+    selected = policy.select_action(observation, legal_actions)
+    selected_via_function = select_action(
+        _Model(),
+        _Tokenizer(),
+        observation,
+        legal_actions,
+        config=InferenceConfig(model_path="dummy"),
+    )
+
+    assert selected.kind == ActionKind.DISCARD
+    assert selected.tile == action.tile
+    assert selected_via_function.kind == ActionKind.DISCARD

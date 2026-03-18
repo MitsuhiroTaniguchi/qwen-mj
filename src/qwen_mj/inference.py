@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -15,6 +15,24 @@ class InferenceConfig:
     max_new_tokens: int = 32
     temperature: float = 0.0
     top_p: float = 1.0
+
+
+@dataclass(slots=True)
+class ModelPolicy:
+    model: Any
+    tokenizer: Any
+    prompt_builder: PromptBuilder = field(default_factory=PromptBuilder)
+    config: InferenceConfig | None = None
+
+    def select_action(self, observation: dict[str, Any], legal_actions: Sequence[Action]) -> Action:
+        return select_action(
+            model=self.model,
+            tokenizer=self.tokenizer,
+            observation=observation,
+            legal_actions=legal_actions,
+            prompt_builder=self.prompt_builder,
+            config=self.config,
+        )
 
 
 def _import_transformers():  # pragma: no cover - optional dependency
@@ -101,6 +119,7 @@ def select_action(
 
 __all__ = [
     "InferenceConfig",
+    "ModelPolicy",
     "completion_to_action",
     "generate_completion",
     "load_model",

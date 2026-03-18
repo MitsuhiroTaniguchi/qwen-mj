@@ -2,7 +2,7 @@ from .environment import MahjongSelfPlayEnv, TableState
 from .encoding import EncodedObservation, ObservationEncoder
 from .experiment import EpisodeSummary, ExperimentSummary, aggregate_experiment, evaluate_against_baseline, run_self_play_experiment, summarize_episode
 from .dataset_validation import DatasetValidationError, DatasetValidationReport, load_jsonl, validate_sft_example, validate_sft_jsonl
-from .inference import InferenceConfig, completion_to_action, generate_completion, load_model, normalize_completion, select_action
+from .inference import InferenceConfig, ModelPolicy, completion_to_action, generate_completion, load_model, normalize_completion, select_action
 from .match import MahjongMatchEnv, MatchState
 from .rollout import FirstLegalPolicy, JsonlRolloutLogger, Policy, RandomPolicy, play_hand, play_match
 from .training_data import CanonicalActionCodec, PromptBuilder, SFTExample, SYSTEM_PROMPT, example_to_dict, write_sft_jsonl
@@ -19,6 +19,7 @@ __all__ = [
     "DatasetValidationError",
     "DatasetValidationReport",
     "InferenceConfig",
+    "ModelPolicy",
     "FirstLegalPolicy",
     "JsonlRolloutLogger",
     "MahjongSelfPlayEnv",

@@ -11,6 +11,7 @@ from .experiment import evaluate_against_baseline, run_self_play_experiment
 from .rollout import FirstLegalPolicy, JsonlRolloutLogger, RandomPolicy, play_hand, play_match
 from .environment import MahjongSelfPlayEnv
 from .dataset_validation import validate_sft_jsonl
+from .inference import InferenceConfig, ModelPolicy, load_model
 from .match import MahjongMatchEnv
 from .training_data import write_sft_jsonl
 from .train_sft import SFTTrainConfig, train_sft
@@ -69,6 +70,17 @@ def build_parser() -> argparse.ArgumentParser:
     validate_parser = subparsers.add_parser("validate-dataset", help="validate an SFT JSONL dataset")
     validate_parser.add_argument("--dataset", type=Path, required=True)
     validate_parser.add_argument("--max-errors", type=int, default=20)
+
+    play_model_parser = subparsers.add_parser("play-model", help="run a model-backed self-play rollout")
+    play_model_parser.add_argument("--mode", choices=["hand", "match"], default="match")
+    play_model_parser.add_argument("--seed", type=int, default=0)
+    play_model_parser.add_argument("--max-steps", type=int, default=1000)
+    play_model_parser.add_argument("--output", type=Path, default=None)
+    play_model_parser.add_argument("--model-path", type=Path, required=True)
+    play_model_parser.add_argument("--adapter-path", type=Path, default=None)
+    play_model_parser.add_argument("--max-new-tokens", type=int, default=32)
+    play_model_parser.add_argument("--temperature", type=float, default=0.0)
+    play_model_parser.add_argument("--top-p", type=float, default=1.0)
 
     return parser
 
@@ -177,6 +189,44 @@ def main(argv: list[str] | None = None) -> int:
         }
         print(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
         return 0 if report.is_valid else 1
+
+    if args.command == "play-model":
+        config = InferenceConfig(
+            model_path=args.model_path,
+            adapter_path=args.adapter_path,
+            max_new_tokens=args.max_new_tokens,
+            temperature=args.temperature,
+            top_p=args.top_p,
+        )
+        model, tokenizer = load_model(config)
+        policy = ModelPolicy(model=model, tokenizer=tokenizer, config=config)
+        logger = JsonlRolloutLogger(args.output) if args.output is not None else None
+        try:
+            if args.mode == "hand":
+                env = MahjongSelfPlayEnv(seed=args.seed)
+                result = play_hand(
+                    env,
+                    policy,
+                    reset_kwargs={"seed": args.seed},
+                    logger=logger,
+                    encoder=encoder,
+                    max_steps=args.max_steps,
+                )
+            else:
+                env = MahjongMatchEnv(seed=args.seed)
+                result = play_match(
+                    env,
+                    policy,
+                    reset_kwargs={"seed": args.seed},
+                    logger=logger,
+                    encoder=encoder,
+                    max_steps=args.max_steps,
+                )
+        finally:
+            if logger is not None:
+                logger.close()
+        print(json.dumps(result["final_observation"], ensure_ascii=False, indent=2, sort_keys=True, default=str))
+        return 0
 
     raise ValueError(f"unknown command: {args.command}")
 
