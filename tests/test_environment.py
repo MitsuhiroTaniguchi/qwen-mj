@@ -2,6 +2,7 @@ import json
 
 from qwen_mj import Action, ActionKind, MahjongMatchEnv, MahjongSelfPlayEnv
 from qwen_mj import FirstLegalPolicy, JsonlRolloutLogger, ObservationEncoder, play_hand, play_match
+from qwen_mj import evaluate_against_baseline, run_self_play_experiment
 from qwen_mj.environment import TableState
 from qwen_mj.match import MatchState
 from qwen_mj.types import Phase, PlayerState, TileInstance
@@ -311,3 +312,14 @@ def test_play_match_returns_match_observation(tmp_path):
     assert "match" in result["final_observation"]
     lines = path.read_text(encoding="utf-8").splitlines()
     assert len(lines) == 1
+
+
+def test_experiment_helpers_return_aggregates():
+    summary = run_self_play_experiment(episodes=2, seed=0, max_steps=1)
+    baseline = evaluate_against_baseline(episodes=2, policy=FirstLegalPolicy(), seed=0, max_steps=1)
+
+    assert summary.num_episodes == 2
+    assert len(summary.mean_final_scores) == 4
+    assert len(summary.mean_score_deltas) == 4
+    assert baseline.num_episodes == 2
+    assert baseline.mean_rank >= 1.0

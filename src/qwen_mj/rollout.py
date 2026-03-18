@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass, is_dataclass
+from dataclasses import asdict, dataclass, field, is_dataclass
 from pathlib import Path
 from random import Random
 from typing import Any, Protocol, Sequence, TextIO
@@ -29,6 +29,7 @@ class FirstLegalPolicy:
 @dataclass(slots=True)
 class RandomPolicy:
     seed: int | None = None
+    _rng: Random = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         self._rng = Random(self.seed)

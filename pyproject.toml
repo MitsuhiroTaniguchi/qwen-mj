@@ -20,6 +20,9 @@ rules = [
   "pymahjong @ git+https://github.com/MitsuhiroTaniguchi/pymahjong",
 ]
 
+[project.scripts]
+qwen-mj = "qwen_mj.cli:main"
+
 [tool.setuptools]
 package-dir = {"" = "src"}
 
