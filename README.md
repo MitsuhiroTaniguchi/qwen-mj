@@ -80,6 +80,13 @@ qwen-mj benchmark-models --model-paths runs/sft/step-100 runs/sft/step-200 --bas
 qwen-mj summarize-benchmark --input runs/benchmark.jsonl --output runs/benchmark-summary.json
 ```
 
+CSV や表形式でも出せる:
+
+```bash
+qwen-mj summarize-benchmark --input runs/benchmark.jsonl --format table
+qwen-mj benchmark-models --model-paths runs/sft/step-100 runs/sft/step-200 --format csv
+```
+
 ## テスト方針
 
 - まず壊れ方をテストで固定する

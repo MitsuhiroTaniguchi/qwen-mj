@@ -11,7 +11,7 @@ from .experiment import evaluate_against_baseline, run_self_play_experiment
 from .rollout import FirstLegalPolicy, JsonlRolloutLogger, RandomPolicy, play_hand, play_match
 from .environment import MahjongSelfPlayEnv
 from .dataset_validation import validate_sft_jsonl
-from .benchmark import evaluate_model_paths, load_model_benchmark_jsonl, model_benchmark_result_to_dict, summarize_model_benchmarks, write_model_benchmark_jsonl
+from .benchmark import benchmark_results_to_csv_text, evaluate_model_paths, load_model_benchmark_jsonl, model_benchmark_result_to_dict, render_benchmark_table, summarize_model_benchmarks, write_model_benchmark_jsonl
 from .experiment import write_experiment_jsonl
 from .inference import InferenceConfig, ModelPolicy, load_model
 from .match import MahjongMatchEnv
@@ -108,10 +108,12 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark_parser.add_argument("--temperature", type=float, default=0.0)
     benchmark_parser.add_argument("--top-p", type=float, default=1.0)
     benchmark_parser.add_argument("--output", type=Path, default=None)
+    benchmark_parser.add_argument("--format", choices=["json", "csv", "table"], default="json")
 
     summarize_benchmark_parser = subparsers.add_parser("summarize-benchmark", help="summarize benchmark JSONL results")
     summarize_benchmark_parser.add_argument("--input", type=Path, required=True)
     summarize_benchmark_parser.add_argument("--output", type=Path, default=None)
+    summarize_benchmark_parser.add_argument("--format", choices=["json", "csv", "table"], default="json")
 
     return parser
 
@@ -300,14 +302,19 @@ def main(argv: list[str] | None = None) -> int:
         )
         if args.output is not None:
             write_model_benchmark_jsonl(results, args.output)
-        print(
-            json.dumps(
-                [model_benchmark_result_to_dict(result) for result in results],
-                ensure_ascii=False,
-                indent=2,
-                sort_keys=True,
+        if args.format == "csv":
+            print(benchmark_results_to_csv_text(results), end="")
+        elif args.format == "table":
+            print(render_benchmark_table(results), end="")
+        else:
+            print(
+                json.dumps(
+                    [model_benchmark_result_to_dict(result) for result in results],
+                    ensure_ascii=False,
+                    indent=2,
+                    sort_keys=True,
+                )
             )
-        )
         return 0
 
     if args.command == "summarize-benchmark":
@@ -318,7 +325,12 @@ def main(argv: list[str] | None = None) -> int:
             with args.output.open("w", encoding="utf-8") as handle:
                 json.dump(payload, handle, ensure_ascii=False, indent=2, sort_keys=True)
                 handle.write("\n")
-        print(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True, default=str))
+        if args.format == "csv":
+            print(benchmark_results_to_csv_text(results), end="")
+        elif args.format == "table":
+            print(render_benchmark_table(results), end="")
+        else:
+            print(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True, default=str))
         return 0
 
     raise ValueError(f"unknown command: {args.command}")

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
+import csv
 import json
+from io import StringIO
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -170,12 +172,86 @@ def summarize_model_benchmarks(results: Sequence[ModelBenchmarkResult]) -> Bench
     )
 
 
+def benchmark_result_row(result: ModelBenchmarkResult) -> dict[str, Any]:
+    return {
+        "model_path": result.model_path,
+        "adapter_path": result.adapter_path,
+        "baseline": result.baseline,
+        "num_episodes": result.summary.num_episodes,
+        "mean_rank": result.summary.mean_rank,
+        "mean_steps": result.summary.mean_steps,
+        "mean_final_scores": list(result.summary.mean_final_scores),
+        "mean_score_deltas": list(result.summary.mean_score_deltas),
+    }
+
+
+def benchmark_results_to_csv_text(results: Sequence[ModelBenchmarkResult]) -> str:
+    rows = sorted((benchmark_result_row(result) for result in results), key=lambda row: row["mean_rank"])
+    if not rows:
+        return ""
+    headers = [
+        "model_path",
+        "adapter_path",
+        "baseline",
+        "num_episodes",
+        "mean_rank",
+        "mean_steps",
+        "mean_final_scores",
+        "mean_score_deltas",
+    ]
+    buffer = StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(headers)
+    for row in rows:
+        writer.writerow(
+            [
+                row["model_path"],
+                row["adapter_path"],
+                row["baseline"],
+                row["num_episodes"],
+                f"{row['mean_rank']:.3f}",
+                f"{row['mean_steps']:.3f}",
+                json.dumps(row["mean_final_scores"], ensure_ascii=False),
+                json.dumps(row["mean_score_deltas"], ensure_ascii=False),
+            ]
+        )
+    return buffer.getvalue()
+
+
+def render_benchmark_table(results: Sequence[ModelBenchmarkResult]) -> str:
+    rows = sorted((benchmark_result_row(result) for result in results), key=lambda row: row["mean_rank"])
+    if not rows:
+        return ""
+    headers = ["model_path", "mean_rank", "mean_steps", "mean_final_scores", "mean_score_deltas"]
+    table_rows = [headers]
+    for row in rows:
+        table_rows.append(
+            [
+                str(row["model_path"]),
+                f"{row['mean_rank']:.3f}",
+                f"{row['mean_steps']:.3f}",
+                json.dumps(row["mean_final_scores"], ensure_ascii=False),
+                json.dumps(row["mean_score_deltas"], ensure_ascii=False),
+            ]
+        )
+    widths = [max(len(item[i]) for item in table_rows) for i in range(len(headers))]
+    lines: list[str] = []
+    for index, row in enumerate(table_rows):
+        lines.append(" | ".join(item.ljust(widths[i]) for i, item in enumerate(row)))
+        if index == 0:
+            lines.append("-+-".join("-" * width for width in widths))
+    return "\n".join(lines) + "\n"
+
+
 __all__ = [
     "BenchmarkSummary",
     "ModelBenchmarkResult",
+    "benchmark_result_row",
+    "benchmark_results_to_csv_text",
     "evaluate_model_paths",
     "load_model_benchmark_jsonl",
     "model_benchmark_result_to_dict",
+    "render_benchmark_table",
     "summarize_model_benchmarks",
     "write_model_benchmark_jsonl",
 ]

@@ -4,7 +4,7 @@ from qwen_mj import Action, ActionKind, MahjongMatchEnv, MahjongSelfPlayEnv
 from qwen_mj import FirstLegalPolicy, JsonlRolloutLogger, ObservationEncoder, play_hand, play_match
 from qwen_mj import evaluate_against_baseline, run_self_play_experiment
 from qwen_mj import write_experiment_jsonl
-from qwen_mj import ModelBenchmarkResult, load_model_benchmark_jsonl, model_benchmark_result_to_dict, summarize_model_benchmarks, write_model_benchmark_jsonl
+from qwen_mj import ModelBenchmarkResult, benchmark_results_to_csv_text, load_model_benchmark_jsonl, model_benchmark_result_to_dict, render_benchmark_table, summarize_model_benchmarks, write_model_benchmark_jsonl
 from qwen_mj import PromptBuilder, SYSTEM_PROMPT, example_to_dict, write_sft_jsonl
 from qwen_mj import example_to_training_text, load_sft_examples
 from qwen_mj import completion_to_action, normalize_completion
@@ -483,6 +483,19 @@ def test_summarize_benchmark_help():
     )
 
     assert "summarize-benchmark" in completed.stdout
+
+
+def test_benchmark_renderers_return_text():
+    summary = run_self_play_experiment(episodes=1, seed=0, max_steps=1)
+    result = ModelBenchmarkResult(model_path="model-a", adapter_path=None, baseline="random", summary=summary, metadata={"tag": "x"})
+
+    csv_text = benchmark_results_to_csv_text([result])
+    table_text = render_benchmark_table([result])
+
+    assert "model_path" in csv_text
+    assert "model-a" in csv_text
+    assert "model-a" in table_text
+    assert "mean_rank" in table_text
 
 
 def test_experiment_jsonl_writer(tmp_path):

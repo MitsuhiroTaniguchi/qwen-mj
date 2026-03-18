@@ -45,6 +45,7 @@ This repository builds a Tenhou-rule self-play environment for Qwen3.5-4B.
 - CLI entrypoints for model-backed self-play, evaluation, and dataset validation.
 - Benchmark helper for sweeping multiple checkpoints against the same baseline.
 - Benchmark re-summarizer for saved JSONL results.
+- Benchmark CSV and table renderers for quick inspection.
 - Regression tests for reset, discard progression, and a known winning hand.
 
 ## Conservative Areas
