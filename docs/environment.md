@@ -34,10 +34,11 @@ This repository builds a Tenhou-rule self-play environment for Qwen3.5-4B.
 - Initial deal and dealer extra tile handling.
 - Self-decision phase for discard, riichi, tsumo, kyushukyuhai, and kan actions.
 - Reaction queues for ron and prioritized calls.
+- Win settlement with fu/fan-based scoring, honba, and riichi stick payout.
+- Exhaustive draw settlement for tenpai / noten payment.
 - Regression tests for reset, discard progression, and a known winning hand.
 
 ## Conservative Areas
 
-- Point settlement is not yet modeled beyond a stable score baseline.
 - Kan-related robbing and some late-round edge cases are handled conservatively.
 - Physical tile identity is preserved in state so riichi discard constraints can be tightened further.

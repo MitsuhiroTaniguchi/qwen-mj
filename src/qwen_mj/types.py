@@ -118,3 +118,6 @@ class WinEvent:
     source_seat: Seat | None = None
     has_hupai: bool = False
     yaku: list[tuple[str, int]] = field(default_factory=list)
+    fanshu: int = 0
+    fu: int = 0
+    damanguan: int = 0

@@ -177,6 +177,61 @@ class MahjongSelfPlayEnv:
         if self.state.phase == Phase.DRAW:
             if action.kind != ActionKind.PASS:
                 raise ValueError(f"expected PASS during DRAW phase, got {action.kind.value}")
+            if self.state.pending_draw_from_dead_wall:
+                if not self.state.dead_wall:
+                    settlement = self._settle_exhaustive_draw()
+                    self.state.phase = Phase.ROUND_END
+                    self.state.truncated = True
+                    truncated = True
+                    info["exhausted"] = "dead_wall"
+                    info["settlement"] = settlement
+                    observation = self.observe()
+                    result = StepResult(
+                        observation=observation,
+                        reward=reward,
+                        terminated=terminated,
+                        truncated=truncated,
+                        info=info,
+                    )
+                    self.history.append(
+                        Transition(
+                            seat=actor,
+                            action=action,
+                            reward=reward,
+                            observation=observation,
+                            terminated=terminated,
+                            truncated=truncated,
+                            info=info,
+                        )
+                    )
+                    return result
+            elif not self.state.live_wall:
+                settlement = self._settle_exhaustive_draw()
+                self.state.phase = Phase.ROUND_END
+                self.state.truncated = True
+                truncated = True
+                info["exhausted"] = "live_wall"
+                info["settlement"] = settlement
+                observation = self.observe()
+                result = StepResult(
+                    observation=observation,
+                    reward=reward,
+                    terminated=terminated,
+                    truncated=truncated,
+                    info=info,
+                )
+                self.history.append(
+                    Transition(
+                        seat=actor,
+                        action=action,
+                        reward=reward,
+                        observation=observation,
+                        terminated=terminated,
+                        truncated=truncated,
+                        info=info,
+                    )
+                )
+                return result
             self._perform_draw(actor)
             info["drawn_tile"] = self._serialize_tile_instance(self.state.players[actor].drawn_tile)
             self.state.phase = Phase.SELF_DECISION
@@ -442,6 +497,9 @@ class MahjongSelfPlayEnv:
             source_seat=source_seat,
             has_hupai=bool(result.has_hupai),
             yaku=result.hupai.tolist() if hasattr(result.hupai, "tolist") else [],
+            fanshu=int(result.fanshu),
+            fu=int(result.fu),
+            damanguan=int(result.damanguan),
         )
 
     # ------------------------------------------------------------------
@@ -604,11 +662,13 @@ class MahjongSelfPlayEnv:
                 raise ValueError("illegal tsumo")
             win = self._win_event(actor, action, player.drawn_tile.tile if player.drawn_tile else 0, None, True)
             self.state.pending_wins = [win]
+            settlement = self._settle_pending_wins()
             reward = 1.0
             terminated = True
             self.state.terminated = True
             self.state.phase = Phase.HAND_END
             info["win"] = self._serialize_win(win)
+            info["settlement"] = settlement
             return {"reward": reward, "terminated": terminated, "truncated": truncated, "info": info}
 
         if action.kind == ActionKind.KYUSHUKYUHAI:
@@ -656,9 +716,15 @@ class MahjongSelfPlayEnv:
         truncated = False
 
         if action.kind == ActionKind.PASS:
+            if opportunity.kind == ActionKind.RON:
+                player = self.state.players[actor]
+                if opportunity.tile not in player.temp_furiten_tiles:
+                    player.temp_furiten_tiles.append(opportunity.tile)
             self.state.reaction_queue.pop(0)
             if not self.state.reaction_queue:
                 if self.state.pending_wins:
+                    settlement = self._settle_pending_wins()
+                    info["settlement"] = settlement
                     self.state.phase = Phase.HAND_END
                     self.state.terminated = True
                     terminated = True
@@ -682,6 +748,8 @@ class MahjongSelfPlayEnv:
             info["win"] = self._serialize_win(win)
             self.state.reaction_queue.pop(0)
             if not self.state.reaction_queue:
+                settlement = self._settle_pending_wins()
+                info["settlement"] = settlement
                 self.state.phase = Phase.HAND_END
                 self.state.terminated = True
                 terminated = True
@@ -731,7 +799,135 @@ class MahjongSelfPlayEnv:
             "source_seat": win.source_seat,
             "tsumo": win.tsumo,
             "has_hupai": win.has_hupai,
+            "fanshu": win.fanshu,
+            "fu": win.fu,
+            "damanguan": win.damanguan,
             "yaku": list(win.yaku),
+        }
+
+    def _round_up_100(self, value: int) -> int:
+        return ((value + 99) // 100) * 100
+
+    def _base_points(self, win: WinEvent) -> int:
+        if win.damanguan > 0:
+            return 8000 * win.damanguan
+        if win.fanshu >= 13:
+            return 8000
+        if win.fanshu >= 11:
+            return 6000
+        if win.fanshu >= 8:
+            return 4000
+        if win.fanshu >= 6:
+            return 3000
+        base = win.fu * (2 ** (win.fanshu + 2))
+        if win.fanshu >= 5 or base >= 2000:
+            return 2000
+        return base
+
+    def _tsumo_payments(self, winner_seat: Seat, base_points: int) -> dict[Seat, int]:
+        payments: dict[Seat, int] = {}
+        if winner_seat == self.state.dealer:
+            payment = self._round_up_100(base_points * 2)
+            for seat in range(PLAYER_COUNT):
+                if seat == winner_seat:
+                    continue
+                payments[seat] = payment + self.state.honba * 100
+            return payments
+
+        dealer_payment = self._round_up_100(base_points * 2) + self.state.honba * 100
+        nondealer_payment = self._round_up_100(base_points) + self.state.honba * 100
+        for seat in range(PLAYER_COUNT):
+            if seat == winner_seat:
+                continue
+            payments[seat] = dealer_payment if seat == self.state.dealer else nondealer_payment
+        return payments
+
+    def _ron_payment(self, winner_seat: Seat, base_points: int) -> int:
+        multiplier = 6 if winner_seat == self.state.dealer else 4
+        return self._round_up_100(base_points * multiplier) + self.state.honba * 300
+
+    def _settle_pending_wins(self) -> dict[str, Any]:
+        if not self.state.pending_wins:
+            return {
+                "kind": "win",
+                "score_deltas": [0, 0, 0, 0],
+                "riichi_pot": 0,
+                "riichi_pot_awarded_to": None,
+                "wins": [],
+            }
+
+        deltas = [0, 0, 0, 0]
+        wins: list[dict[str, Any]] = []
+        riichi_pot = self.state.riichi_sticks * RIICHI_STICK_COST
+        riichi_winner = self.state.pending_wins[0].seat if riichi_pot else None
+
+        for win in self.state.pending_wins:
+            base_points = self._base_points(win)
+            if win.tsumo:
+                payments = self._tsumo_payments(win.seat, base_points)
+                for payer, payment in payments.items():
+                    deltas[payer] -= payment
+                    deltas[win.seat] += payment
+                wins.append(
+                    {
+                        "seat": win.seat,
+                        "kind": "tsumo",
+                        "base_points": base_points,
+                        "payments": payments,
+                    }
+                )
+                continue
+
+            if win.source_seat is None:
+                raise ValueError("ron win missing source seat")
+            payment = self._ron_payment(win.seat, base_points)
+            deltas[win.source_seat] -= payment
+            deltas[win.seat] += payment
+            wins.append(
+                {
+                    "seat": win.seat,
+                    "kind": "ron",
+                    "base_points": base_points,
+                    "payment": payment,
+                    "source_seat": win.source_seat,
+                }
+            )
+
+        if riichi_pot and riichi_winner is not None:
+            deltas[riichi_winner] += riichi_pot
+            self.state.riichi_sticks = 0
+
+        for seat, delta in enumerate(deltas):
+            self.state.scores[seat] += delta
+
+        return {
+            "kind": "win",
+            "score_deltas": deltas,
+            "riichi_pot": riichi_pot,
+            "riichi_pot_awarded_to": riichi_winner,
+            "wins": wins,
+        }
+
+    def _settle_exhaustive_draw(self) -> dict[str, Any]:
+        tenpai_seats = [seat for seat in range(PLAYER_COUNT) if self._player_wait_mask(seat) != 0]
+        deltas = [0, 0, 0, 0]
+
+        if len(tenpai_seats) in {1, 2, 3}:
+            if len(tenpai_seats) == 1:
+                tenpai_delta, noten_delta = 3000, -1000
+            elif len(tenpai_seats) == 2:
+                tenpai_delta, noten_delta = 1500, -1500
+            else:
+                tenpai_delta, noten_delta = 1000, -3000
+            tenpai = set(tenpai_seats)
+            for seat in range(PLAYER_COUNT):
+                deltas[seat] = tenpai_delta if seat in tenpai else noten_delta
+                self.state.scores[seat] += deltas[seat]
+
+        return {
+            "kind": "draw",
+            "tenpai_seats": tenpai_seats,
+            "score_deltas": deltas,
         }
 
     def _apply_discard(self, seat: Seat, action: Action) -> dict[str, Any]:
@@ -752,6 +948,7 @@ class MahjongSelfPlayEnv:
             player.riichi = True
             player.riichi_declared_turn = self.state.turn_index
             self.state.riichi_sticks += 1
+            self.state.scores[seat] -= RIICHI_STICK_COST
 
         self._remove_tile_instance(player, tile)
         player.discards.append(tile)
@@ -1026,12 +1223,16 @@ class MahjongSelfPlayEnv:
                 self.state.current_seat = self.state.reaction_queue[0].seat
             else:
                 if self.state.pending_wins:
+                    settlement = self._settle_pending_wins()
+                    info["settlement"] = settlement
                     self.state.phase = Phase.HAND_END
                     self.state.terminated = True
                     terminated = True
                 else:
                     if self.state.pending_call_action is not None:
+                        resolved_call = self.state.pending_call_action.kind.value
                         self._resolve_pending_call_without_reactions()
+                        info["resolved_call"] = resolved_call
                     else:
                         self._advance_to_next_draw(after_discard=True)
             return {"reward": reward, "terminated": terminated, "truncated": truncated, "info": info}
@@ -1048,6 +1249,8 @@ class MahjongSelfPlayEnv:
             if self.state.reaction_queue:
                 self.state.current_seat = self.state.reaction_queue[0].seat
             else:
+                settlement = self._settle_pending_wins()
+                info["settlement"] = settlement
                 self.state.phase = Phase.HAND_END
                 self.state.terminated = True
                 terminated = True
@@ -1123,9 +1326,7 @@ class MahjongSelfPlayEnv:
             self.state.current_seat = seat
             self.state.phase = Phase.SELF_DECISION
         elif action.kind == ActionKind.MINKAN:
-            self._draw_from_dead_wall(seat)
-            self.state.current_seat = seat
-            self.state.phase = Phase.SELF_DECISION
+            self._prepare_rinshan_draw(seat)
         self.state.pending_call_action = None
         self.state.pending_call_seat = None
 

@@ -49,6 +49,29 @@ def test_discard_advances_to_next_draw_when_no_reactions():
     assert env.history[-1].info["actor_seat"] == 0
 
 
+def test_riichi_deducts_stick_cost_and_records_pot():
+    env = MahjongSelfPlayEnv(seed=0)
+    players = _make_empty_players()
+    players[0].tiles = _make_tiles([1, 2, 3, 10, 11, 12, 19, 20, 21, 3, 4, 5, 14, 0])
+    players[0].drawn_tile = players[0].tiles[-1]
+    players[0].has_drawn_this_turn = True
+    env.state = TableState(
+        dealer=0,
+        current_seat=0,
+        phase=Phase.SELF_DECISION,
+        players=players,
+        live_wall=_make_tiles([6, 7, 8]),
+        dead_wall=_make_tiles([9] * 14),
+    )
+
+    result = env.step(Action(ActionKind.RIICHI, tile=0, meta={"tile_index": 13, "red": False}))
+
+    assert result.info["tile"].tile == 0
+    assert env.state.scores == [24000, 25000, 25000, 25000]
+    assert env.state.riichi_sticks == 1
+    assert env.state.players[0].riichi is True
+
+
 def test_tsumo_terminates_hand_for_known_winning_hand():
     env = MahjongSelfPlayEnv(seed=0)
     players = _make_empty_players()
@@ -73,6 +96,10 @@ def test_tsumo_terminates_hand_for_known_winning_hand():
     assert result.reward == 1.0
     assert result.terminated is True
     assert result.observation["phase"] == "hand_end"
+    assert result.info["settlement"]["score_deltas"] == [11700, -3900, -3900, -3900]
+    assert env.state.scores == [36700, 21100, 21100, 21100]
+    assert result.info["win"]["fanshu"] == 4
+    assert result.info["win"]["fu"] == 30
 
 
 def test_ron_blocks_lower_priority_calls_on_same_discard():
@@ -101,3 +128,51 @@ def test_ron_blocks_lower_priority_calls_on_same_discard():
     assert len(env.state.reaction_queue) == 1
     assert env.state.reaction_queue[0].seat == 1
     assert env.state.reaction_queue[0].kind == ActionKind.RON
+
+
+def test_ron_settles_points_for_nondealer_winner():
+    env = MahjongSelfPlayEnv(seed=0)
+    players = _make_empty_players()
+    players[1].tiles = _make_tiles([1, 2, 3, 10, 11, 12, 19, 20, 21, 3, 4, 5, 14])
+    players[0].tiles = _make_tiles([14, 0, 6, 7, 8, 9, 16, 17, 18, 22, 23, 24, 25, 26])
+    players[0].drawn_tile = players[0].tiles[0]
+    players[0].has_drawn_this_turn = True
+    env.state = TableState(
+        dealer=0,
+        current_seat=0,
+        phase=Phase.SELF_DECISION,
+        players=players,
+        live_wall=_make_tiles([9, 9, 9]),
+        dead_wall=_make_tiles([9] * 14),
+    )
+
+    discard = next(action for action in env.legal_actions() if action.kind == ActionKind.DISCARD and action.tile == 14)
+    env.step(discard)
+    result = env.step(Action(ActionKind.RON, tile=14))
+
+    assert result.terminated is True
+    assert result.info["settlement"]["score_deltas"] == [-5200, 5200, 0, 0]
+    assert env.state.scores == [19800, 30200, 25000, 25000]
+    assert result.info["win"]["fanshu"] == 3
+    assert result.info["win"]["fu"] == 40
+
+
+def test_exhaustive_draw_settles_tenpai_payments():
+    env = MahjongSelfPlayEnv(seed=0)
+    players = _make_empty_players()
+    players[0].tiles = _make_tiles([1, 2, 3, 10, 11, 12, 19, 20, 21, 3, 4, 5, 14])
+    env.state = TableState(
+        dealer=0,
+        current_seat=0,
+        phase=Phase.DRAW,
+        players=players,
+        live_wall=[],
+        dead_wall=_make_tiles([9] * 14),
+    )
+
+    result = env.step(Action(ActionKind.PASS))
+
+    assert result.truncated is True
+    assert result.info["settlement"]["tenpai_seats"] == [0]
+    assert result.info["settlement"]["score_deltas"] == [3000, -1000, -1000, -1000]
+    assert env.state.scores == [28000, 24000, 24000, 24000]
