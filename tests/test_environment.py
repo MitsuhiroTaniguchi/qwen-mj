@@ -3,6 +3,7 @@ import json
 from qwen_mj import Action, ActionKind, MahjongMatchEnv, MahjongSelfPlayEnv
 from qwen_mj import FirstLegalPolicy, JsonlRolloutLogger, ObservationEncoder, play_hand, play_match
 from qwen_mj import evaluate_against_baseline, run_self_play_experiment
+from qwen_mj import PromptBuilder, SYSTEM_PROMPT, example_to_dict, write_sft_jsonl
 from qwen_mj.environment import TableState
 from qwen_mj.match import MatchState
 from qwen_mj.types import Phase, PlayerState, TileInstance
@@ -323,3 +324,29 @@ def test_experiment_helpers_return_aggregates():
     assert len(summary.mean_score_deltas) == 4
     assert baseline.num_episodes == 2
     assert baseline.mean_rank >= 1.0
+
+
+def test_prompt_builder_and_dataset_writer(tmp_path):
+    env = MahjongSelfPlayEnv(seed=0)
+    observation = env.reset()
+    legal_actions = env.legal_actions()
+    action = next(item for item in legal_actions if item.kind == ActionKind.DISCARD)
+
+    builder = PromptBuilder()
+    example = builder.build_example(observation, legal_actions, action)
+    output = tmp_path / "sft.jsonl"
+
+    count = write_sft_jsonl([{"sft_example": example_to_dict(example)}], output)
+    overwrite_count = write_sft_jsonl([{"sft_example": example_to_dict(example)}], output)
+
+    lines = output.read_text(encoding="utf-8").splitlines()
+    payload = json.loads(lines[0])
+
+    assert SYSTEM_PROMPT in example.prompt
+    assert example.messages[0].role == "system"
+    assert example.completion.startswith("DISCARD ")
+    assert count == 1
+    assert overwrite_count == 1
+    assert len(lines) == 1
+    assert payload["completion"].startswith("DISCARD ")
+    assert payload["messages"][0]["role"] == "system"

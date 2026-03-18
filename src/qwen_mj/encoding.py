@@ -227,5 +227,8 @@ class ObservationEncoder:
         honor = HONOR_NAMES[tile - 27]
         return honor
 
+    def format_tile(self, tile: int) -> str:
+        return self._format_tile_index(tile)
+
 
 __all__ = ["EncodedObservation", "ObservationEncoder"]

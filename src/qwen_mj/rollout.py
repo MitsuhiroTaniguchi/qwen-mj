@@ -10,6 +10,7 @@ import numpy as np
 
 from .encoding import ObservationEncoder
 from .environment import MahjongSelfPlayEnv
+from .training_data import PromptBuilder, example_to_dict
 from .match import MahjongMatchEnv
 from .types import Action, Transition
 
@@ -120,17 +121,23 @@ def play_hand(
     observation = env.reset(**(reset_kwargs or {}))
     records: list[dict[str, Any]] = []
     encoder = encoder or ObservationEncoder()
+    prompt_builder = PromptBuilder(encoder)
 
     for step_index in range(max_steps):
         seat = env.state.current_seat
         legal_actions = env.legal_actions(seat)
+        state_before = observation
         policy = _policy_for_seat(policies, seat)
         action = policy.select_action(observation, legal_actions)
         result = env.step(action)
+        example = prompt_builder.build_example(state_before, legal_actions, action)
+        sft_example = example_to_dict(example)
         record = {
             "episode_id": episode_id,
             "step_index": step_index,
             "seat": seat,
+            "observation_before": state_before,
+            "legal_actions": [_serialize_action(item) for item in legal_actions],
             "action": _serialize_action(action),
             "result": {
                 "reward": result.reward,
@@ -139,6 +146,11 @@ def play_hand(
                 "info": dict(result.info),
             },
             "observation": result.observation,
+            "messages": sft_example["messages"],
+            "prompt": sft_example["prompt"],
+            "completion": sft_example["completion"],
+            "state_text": sft_example["state_text"],
+            "sft_example": sft_example,
             "encoded": encoder.encode(result.observation),
             "text": encoder.render_text(result.observation, env.legal_actions(result.observation["current_seat"])),
         }
@@ -168,6 +180,7 @@ def play_match(
     observation = env.reset(**(reset_kwargs or {}))
     records: list[dict[str, Any]] = []
     encoder = encoder or ObservationEncoder()
+    prompt_builder = PromptBuilder(encoder)
 
     for step_index in range(max_steps):
         if env.state.terminated or env.state.truncated:
@@ -178,15 +191,20 @@ def play_match(
 
         seat = env.hand_env.state.current_seat
         legal_actions = env.legal_actions(seat)
+        state_before = env.hand_env.observe(seat)
         policy = _policy_for_seat(policies, seat)
-        action = policy.select_action(env.hand_env.observe(seat), legal_actions)
+        action = policy.select_action(state_before, legal_actions)
         result = env.step(action)
         hand_observation = result.observation
         match_observation = env.observe()
+        example = prompt_builder.build_example(state_before, legal_actions, action)
+        sft_example = example_to_dict(example)
         record = {
             "episode_id": episode_id,
             "step_index": step_index,
             "seat": seat,
+            "observation_before": state_before,
+            "legal_actions": [_serialize_action(item) for item in legal_actions],
             "action": _serialize_action(action),
             "result": {
                 "reward": result.reward,
@@ -198,6 +216,11 @@ def play_match(
                 "match": match_observation["match"],
                 "hand": hand_observation,
             },
+            "messages": sft_example["messages"],
+            "prompt": sft_example["prompt"],
+            "completion": sft_example["completion"],
+            "state_text": sft_example["state_text"],
+            "sft_example": sft_example,
             "encoded": encoder.encode(hand_observation),
             "text": encoder.render_text(hand_observation, env.legal_actions(hand_observation["current_seat"])),
         }
