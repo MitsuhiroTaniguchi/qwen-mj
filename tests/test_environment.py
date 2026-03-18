@@ -5,6 +5,8 @@ from qwen_mj import FirstLegalPolicy, JsonlRolloutLogger, ObservationEncoder, pl
 from qwen_mj import evaluate_against_baseline, run_self_play_experiment
 from qwen_mj import PromptBuilder, SYSTEM_PROMPT, example_to_dict, write_sft_jsonl
 from qwen_mj import example_to_training_text, load_sft_examples
+from qwen_mj import completion_to_action, normalize_completion
+from qwen_mj import validate_sft_example, validate_sft_jsonl
 from qwen_mj.environment import TableState
 from qwen_mj.match import MatchState
 from qwen_mj.types import Phase, PlayerState, TileInstance
@@ -386,3 +388,56 @@ def test_sft_example_loader_and_training_text(tmp_path):
     assert examples[0]["completion"] == "DISCARD 1m"
     assert text.endswith("<eos>")
     assert "assistant:DISCARD 1m" in text
+
+
+def test_sft_dataset_validator(tmp_path):
+    env = MahjongSelfPlayEnv(seed=0)
+    observation = env.reset()
+    legal_actions = env.legal_actions()
+    action = next(item for item in legal_actions if item.kind == ActionKind.DISCARD)
+    example = PromptBuilder().build_example(observation, legal_actions, action)
+    valid_payload = {"sft_example": example_to_dict(example)}
+
+    path = tmp_path / "valid.jsonl"
+    path.write_text(json.dumps(valid_payload, ensure_ascii=False) + "\n", encoding="utf-8")
+
+    report = validate_sft_jsonl(path)
+    assert report.is_valid
+    assert report.num_records == 1
+    assert report.num_invalid == 0
+    assert validate_sft_example(valid_payload["sft_example"]) == []
+
+    invalid_path = tmp_path / "invalid.jsonl"
+    invalid_path.write_text(
+        json.dumps(
+            {
+                "messages": [{"role": "system", "content": SYSTEM_PROMPT}],
+                "completion": "NOT A LEGAL ACTION",
+                "prompt": SYSTEM_PROMPT,
+                "state_text": "x",
+                "legal_actions": ["DISCARD 1m"],
+                "action": {},
+            },
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    invalid_report = validate_sft_jsonl(invalid_path)
+    assert not invalid_report.is_valid
+    assert invalid_report.num_invalid == 1
+    assert invalid_report.errors
+
+
+def test_completion_to_action_round_trips_legal_action():
+    env = MahjongSelfPlayEnv(seed=0)
+    observation = env.reset()
+    legal_actions = env.legal_actions()
+    action = next(item for item in legal_actions if item.kind == ActionKind.DISCARD)
+
+    completion = f"  {PromptBuilder().codec.encode(action)}\nextra text  "
+    parsed = completion_to_action(completion, legal_actions)
+
+    assert normalize_completion(completion) == PromptBuilder().codec.encode(action)
+    assert parsed.kind == ActionKind.DISCARD

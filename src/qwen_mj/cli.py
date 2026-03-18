@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import asdict
 import json
 from pathlib import Path
 from typing import Any
@@ -9,6 +10,7 @@ from .encoding import ObservationEncoder
 from .experiment import evaluate_against_baseline, run_self_play_experiment
 from .rollout import FirstLegalPolicy, JsonlRolloutLogger, RandomPolicy, play_hand, play_match
 from .environment import MahjongSelfPlayEnv
+from .dataset_validation import validate_sft_jsonl
 from .match import MahjongMatchEnv
 from .training_data import write_sft_jsonl
 from .train_sft import SFTTrainConfig, train_sft
@@ -63,6 +65,10 @@ def build_parser() -> argparse.ArgumentParser:
     train_parser.add_argument("--lora-alpha", type=int, default=16)
     train_parser.add_argument("--lora-dropout", type=float, default=0.0)
     train_parser.add_argument("--save-method", choices=["lora", "merged_16bit"], default="lora")
+
+    validate_parser = subparsers.add_parser("validate-dataset", help="validate an SFT JSONL dataset")
+    validate_parser.add_argument("--dataset", type=Path, required=True)
+    validate_parser.add_argument("--max-errors", type=int, default=20)
 
     return parser
 
@@ -158,6 +164,19 @@ def main(argv: list[str] | None = None) -> int:
         summary = train_sft(config)
         print(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True))
         return 0
+
+    if args.command == "validate-dataset":
+        report = validate_sft_jsonl(args.dataset, max_errors=args.max_errors)
+        payload = {
+            "path": report.path,
+            "num_records": report.num_records,
+            "num_valid": report.num_valid,
+            "num_invalid": report.num_invalid,
+            "is_valid": report.is_valid,
+            "errors": [asdict(error) for error in report.errors],
+        }
+        print(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
+        return 0 if report.is_valid else 1
 
     raise ValueError(f"unknown command: {args.command}")
 

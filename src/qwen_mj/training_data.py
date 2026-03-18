@@ -49,7 +49,15 @@ class CanonicalActionCodec:
         raise ValueError(f"unsupported action kind: {kind.value}")
 
     def format_legal_actions(self, actions: Sequence[Action]) -> list[str]:
-        return [self.encode(action) for action in actions]
+        encoded: list[str] = []
+        seen: set[str] = set()
+        for action in actions:
+            text = self.encode(action)
+            if text in seen:
+                continue
+            seen.add(text)
+            encoded.append(text)
+        return encoded
 
     def _discard(self, action: Action) -> str:
         return f"DISCARD {self._tile_with_red(action)}"

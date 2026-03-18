@@ -42,6 +42,14 @@ Unsloth で SFT を回す:
 qwen-mj train-sft --dataset data/sft.jsonl --output-dir runs/sft
 ```
 
+学習前にデータを検査する:
+
+```bash
+qwen-mj validate-dataset --dataset data/sft.jsonl
+```
+
+推論は `qwen_mj.select_action(...)` または `qwen_mj.completion_to_action(...)` を使う。
+
 ## テスト方針
 
 - まず壊れ方をテストで固定する

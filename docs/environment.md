@@ -40,6 +40,8 @@ This repository builds a Tenhou-rule self-play environment for Qwen3.5-4B.
 - Observation encoder for numeric tensors and deterministic text views.
 - JSONL rollout writer and simple baseline policies for data generation.
 - Self-play experiment aggregation and baseline evaluation helpers.
+- SFT dataset validation for canonical prompt/completion consistency.
+- Inference helpers that map canonical completions back to legal actions.
 - Regression tests for reset, discard progression, and a known winning hand.
 
 ## Conservative Areas
