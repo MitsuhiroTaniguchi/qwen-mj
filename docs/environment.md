@@ -28,3 +28,16 @@ This repository builds a Tenhou-rule self-play environment for Qwen3.5-4B.
 4. Add observation encoders.
 5. Add rollout exporters and benchmarks.
 
+## Current Coverage
+
+- Four-player tile generation with red fives.
+- Initial deal and dealer extra tile handling.
+- Self-decision phase for discard, riichi, tsumo, kyushukyuhai, and kan actions.
+- Reaction queues for ron and prioritized calls.
+- Regression tests for reset, discard progression, and a known winning hand.
+
+## Conservative Areas
+
+- Point settlement is not yet modeled beyond a stable score baseline.
+- Kan-related robbing and some late-round edge cases are handled conservatively.
+- Physical tile identity is preserved in state so riichi discard constraints can be tightened further.
