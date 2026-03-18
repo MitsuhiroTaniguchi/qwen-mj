@@ -62,6 +62,12 @@ qwen-mj play-model --mode match --model-path runs/sft/merged
 qwen-mj evaluate-model --episodes 20 --model-path runs/sft/merged --baseline random
 ```
 
+結果を JSONL に保存する:
+
+```bash
+qwen-mj evaluate-model --episodes 20 --model-path runs/sft/merged --baseline random --output runs/eval.jsonl
+```
+
 ## テスト方針
 
 - まず壊れ方をテストで固定する

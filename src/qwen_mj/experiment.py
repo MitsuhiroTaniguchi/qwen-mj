@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
+import json
+from pathlib import Path
 from typing import Any, Callable, Sequence
 
 from .encoding import ObservationEncoder
@@ -133,6 +135,41 @@ def aggregate_experiment(episode_summaries: Sequence[EpisodeSummary]) -> Experim
     )
 
 
+def experiment_summary_to_dict(summary: ExperimentSummary) -> dict[str, Any]:
+    payload = asdict(summary)
+    payload["episode_summaries"] = [asdict(item) for item in summary.episode_summaries]
+    return payload
+
+
+def write_experiment_jsonl(summary: ExperimentSummary, path: str | Path) -> int:
+    output_path = Path(path)
+    with output_path.open("w", encoding="utf-8") as handle:
+        for episode in summary.episode_summaries:
+            handle.write(
+                json.dumps(
+                    {
+                        "kind": "episode_summary",
+                        "episode_summary": asdict(episode),
+                    },
+                    ensure_ascii=False,
+                    sort_keys=True,
+                )
+                + "\n"
+            )
+        handle.write(
+            json.dumps(
+                {
+                    "kind": "experiment_summary",
+                    "experiment_summary": experiment_summary_to_dict(summary),
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+            )
+            + "\n"
+        )
+    return len(summary.episode_summaries) + 1
+
+
 def run_self_play_experiment(
     episodes: int,
     env_factory: Callable[[], MahjongMatchEnv] | None = None,
@@ -190,6 +227,8 @@ __all__ = [
     "ExperimentSummary",
     "aggregate_experiment",
     "evaluate_against_baseline",
+    "experiment_summary_to_dict",
     "run_self_play_experiment",
     "summarize_episode",
+    "write_experiment_jsonl",
 ]

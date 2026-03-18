@@ -1,6 +1,6 @@
 from .environment import MahjongSelfPlayEnv, TableState
 from .encoding import EncodedObservation, ObservationEncoder
-from .experiment import EpisodeSummary, ExperimentSummary, aggregate_experiment, evaluate_against_baseline, run_self_play_experiment, summarize_episode
+from .experiment import EpisodeSummary, ExperimentSummary, aggregate_experiment, evaluate_against_baseline, run_self_play_experiment, summarize_episode, write_experiment_jsonl
 from .dataset_validation import DatasetValidationError, DatasetValidationReport, load_jsonl, validate_sft_example, validate_sft_jsonl
 from .inference import InferenceConfig, ModelPolicy, completion_to_action, generate_completion, load_model, normalize_completion, select_action
 from .match import MahjongMatchEnv, MatchState
@@ -57,6 +57,7 @@ __all__ = [
     "run_self_play_experiment",
     "summarize_episode",
     "train_sft",
+    "write_experiment_jsonl",
     "write_sft_jsonl",
     "play_hand",
     "play_match",

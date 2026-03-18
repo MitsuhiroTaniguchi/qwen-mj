@@ -11,6 +11,7 @@ from .experiment import evaluate_against_baseline, run_self_play_experiment
 from .rollout import FirstLegalPolicy, JsonlRolloutLogger, RandomPolicy, play_hand, play_match
 from .environment import MahjongSelfPlayEnv
 from .dataset_validation import validate_sft_jsonl
+from .experiment import write_experiment_jsonl
 from .inference import InferenceConfig, ModelPolicy, load_model
 from .match import MahjongMatchEnv
 from .training_data import write_sft_jsonl
@@ -40,6 +41,7 @@ def build_parser() -> argparse.ArgumentParser:
     evaluate_parser.add_argument("--max-steps", type=int, default=10000)
     evaluate_parser.add_argument("--baseline", choices=["first-legal", "random"], default="random")
     evaluate_parser.add_argument("--policy", choices=["first-legal", "random"], default="first-legal")
+    evaluate_parser.add_argument("--output", type=Path, default=None)
 
     dataset_parser = subparsers.add_parser("dataset", help="generate SFT JSONL dataset from rollouts")
     dataset_parser.add_argument("--mode", choices=["hand", "match"], default="match")
@@ -92,6 +94,7 @@ def build_parser() -> argparse.ArgumentParser:
     evaluate_model_parser.add_argument("--max-new-tokens", type=int, default=32)
     evaluate_model_parser.add_argument("--temperature", type=float, default=0.0)
     evaluate_model_parser.add_argument("--top-p", type=float, default=1.0)
+    evaluate_model_parser.add_argument("--output", type=Path, default=None)
 
     return parser
 
@@ -146,6 +149,8 @@ def main(argv: list[str] | None = None) -> int:
             encoder=encoder,
             max_steps=args.max_steps,
         )
+        if args.output is not None:
+            write_experiment_jsonl(summary, args.output)
         print(json.dumps(summary.__dict__, ensure_ascii=False, indent=2, sort_keys=True, default=str))
         return 0
 
@@ -258,6 +263,8 @@ def main(argv: list[str] | None = None) -> int:
             encoder=encoder,
             max_steps=args.max_steps,
         )
+        if args.output is not None:
+            write_experiment_jsonl(summary, args.output)
         print(json.dumps(summary.__dict__, ensure_ascii=False, indent=2, sort_keys=True, default=str))
         return 0
 

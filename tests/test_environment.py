@@ -3,6 +3,7 @@ import json
 from qwen_mj import Action, ActionKind, MahjongMatchEnv, MahjongSelfPlayEnv
 from qwen_mj import FirstLegalPolicy, JsonlRolloutLogger, ObservationEncoder, play_hand, play_match
 from qwen_mj import evaluate_against_baseline, run_self_play_experiment
+from qwen_mj import write_experiment_jsonl
 from qwen_mj import PromptBuilder, SYSTEM_PROMPT, example_to_dict, write_sft_jsonl
 from qwen_mj import example_to_training_text, load_sft_examples
 from qwen_mj import completion_to_action, normalize_completion
@@ -455,6 +456,23 @@ def test_evaluate_model_help():
     )
 
     assert "evaluate-model" in completed.stdout
+
+
+def test_experiment_jsonl_writer(tmp_path):
+    summary = run_self_play_experiment(episodes=1, seed=0, max_steps=1)
+    path = tmp_path / "experiment.jsonl"
+
+    count = write_experiment_jsonl(summary, path)
+
+    lines = path.read_text(encoding="utf-8").splitlines()
+    first = json.loads(lines[0])
+    last = json.loads(lines[-1])
+
+    assert count == 2
+    assert len(lines) == 2
+    assert first["kind"] == "episode_summary"
+    assert last["kind"] == "experiment_summary"
+    assert last["experiment_summary"]["num_episodes"] == 1
 
 
 def test_completion_to_action_round_trips_legal_action():
