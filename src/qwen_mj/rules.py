@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from functools import cached_property
+from dataclasses import dataclass, field
 from typing import Any
 
 
@@ -14,9 +13,12 @@ class PyMahjongRulesAdapter:
     """
 
     three_player: bool = False
+    _pm: Any = field(default=None, init=False, repr=False)
 
-    @cached_property
+    @property
     def pm(self):
+        if self._pm is not None:
+            return self._pm
         try:
             import pymahjong as pm  # type: ignore
         except Exception as exc:  # pragma: no cover - import guard
@@ -24,6 +26,7 @@ class PyMahjongRulesAdapter:
                 "pymahjong is required for rule evaluation. Install the optional "
                 "`rules` dependency or add pymahjong to the environment."
             ) from exc
+        self._pm = pm
         return pm
 
     def compute_self_options(self, *args: Any, **kwargs: Any):
@@ -43,4 +46,3 @@ class PyMahjongRulesAdapter:
 
     def evaluate_draw(self, *args: Any, **kwargs: Any):
         return self.pm.evaluate_draw(*args, **kwargs)
-

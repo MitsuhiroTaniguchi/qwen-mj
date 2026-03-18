@@ -1,0 +1,3 @@
+-r requirements.txt
+pymahjong @ git+https://github.com/MitsuhiroTaniguchi/pymahjong
+

@@ -13,3 +13,4 @@ outputs/
 runs/
 wandb/
 *.sqlite3
+*.egg-info/

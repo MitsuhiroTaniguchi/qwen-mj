@@ -15,3 +15,19 @@ Qwen3.5-4B を麻雀の自己対戦環境で学習・評価するための実験
 - 学習スクリプト
 - 評価スクリプト
 - 実験ログ
+
+## セットアップ
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements-dev.txt
+```
+
+`pymahjong` を使うルール検証まで入れる場合は、`requirements-rules.txt` を追加で入れる。
+
+## テスト方針
+
+- まず壊れ方をテストで固定する
+- ルール分岐の変更には必ず回帰テストを追加する
+- 自己対戦の大規模実験より前に、状態遷移の単体テストで潰す
