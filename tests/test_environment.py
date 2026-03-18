@@ -444,6 +444,19 @@ def test_play_model_help():
     assert "play-model" in completed.stdout
 
 
+def test_evaluate_model_help():
+    import subprocess
+
+    completed = subprocess.run(
+        [".venv/bin/python", "-m", "qwen_mj.cli", "evaluate-model", "--help"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "evaluate-model" in completed.stdout
+
+
 def test_completion_to_action_round_trips_legal_action():
     env = MahjongSelfPlayEnv(seed=0)
     observation = env.reset()

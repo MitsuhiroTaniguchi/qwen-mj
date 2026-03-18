@@ -56,6 +56,12 @@ qwen-mj validate-dataset --dataset data/sft.jsonl
 qwen-mj play-model --mode match --model-path runs/sft/merged
 ```
 
+学習済みモデルを固定ベースラインと比較する:
+
+```bash
+qwen-mj evaluate-model --episodes 20 --model-path runs/sft/merged --baseline random
+```
+
 ## テスト方針
 
 - まず壊れ方をテストで固定する

@@ -82,6 +82,17 @@ def build_parser() -> argparse.ArgumentParser:
     play_model_parser.add_argument("--temperature", type=float, default=0.0)
     play_model_parser.add_argument("--top-p", type=float, default=1.0)
 
+    evaluate_model_parser = subparsers.add_parser("evaluate-model", help="evaluate a model-backed policy against a baseline")
+    evaluate_model_parser.add_argument("--episodes", type=int, default=10)
+    evaluate_model_parser.add_argument("--seed", type=int, default=0)
+    evaluate_model_parser.add_argument("--max-steps", type=int, default=10000)
+    evaluate_model_parser.add_argument("--baseline", choices=["first-legal", "random"], default="random")
+    evaluate_model_parser.add_argument("--model-path", type=Path, required=True)
+    evaluate_model_parser.add_argument("--adapter-path", type=Path, default=None)
+    evaluate_model_parser.add_argument("--max-new-tokens", type=int, default=32)
+    evaluate_model_parser.add_argument("--temperature", type=float, default=0.0)
+    evaluate_model_parser.add_argument("--top-p", type=float, default=1.0)
+
     return parser
 
 
@@ -226,6 +237,28 @@ def main(argv: list[str] | None = None) -> int:
             if logger is not None:
                 logger.close()
         print(json.dumps(result["final_observation"], ensure_ascii=False, indent=2, sort_keys=True, default=str))
+        return 0
+
+    if args.command == "evaluate-model":
+        config = InferenceConfig(
+            model_path=args.model_path,
+            adapter_path=args.adapter_path,
+            max_new_tokens=args.max_new_tokens,
+            temperature=args.temperature,
+            top_p=args.top_p,
+        )
+        model, tokenizer = load_model(config)
+        policy = ModelPolicy(model=model, tokenizer=tokenizer, config=config)
+        baseline = _policy_from_name(args.baseline, args.seed)
+        summary = evaluate_against_baseline(
+            episodes=args.episodes,
+            policy=policy,
+            baseline=baseline,
+            seed=args.seed,
+            encoder=encoder,
+            max_steps=args.max_steps,
+        )
+        print(json.dumps(summary.__dict__, ensure_ascii=False, indent=2, sort_keys=True, default=str))
         return 0
 
     raise ValueError(f"unknown command: {args.command}")
