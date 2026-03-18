@@ -71,13 +71,27 @@ class MahjongSelfPlayEnv:
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
-    def reset(self, dealer: Seat = 0, seed: int | None = None) -> dict[str, Any]:
+    def reset(
+        self,
+        dealer: Seat = 0,
+        seed: int | None = None,
+        scores: list[int] | None = None,
+        round_wind: int = 0,
+        honba: int = 0,
+        riichi_sticks: int = 0,
+    ) -> dict[str, Any]:
         if seed is not None:
             self._seed = seed
             self._rng = Random(seed)
 
         deck = self._build_deck()
-        self.state = TableState(dealer=dealer)
+        self.state = TableState(
+            dealer=dealer,
+            round_wind=round_wind,
+            honba=honba,
+            riichi_sticks=riichi_sticks,
+            scores=list(scores) if scores is not None else [STARTING_SCORE for _ in range(PLAYER_COUNT)],
+        )
         self.history.clear()
 
         self.state.live_wall = deck[:-14]

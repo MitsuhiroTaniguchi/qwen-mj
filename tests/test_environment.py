@@ -1,5 +1,6 @@
-from qwen_mj import Action, ActionKind, MahjongSelfPlayEnv
+from qwen_mj import Action, ActionKind, MahjongMatchEnv, MahjongSelfPlayEnv
 from qwen_mj.environment import TableState
+from qwen_mj.match import MatchState
 from qwen_mj.types import Phase, PlayerState, TileInstance
 
 
@@ -176,3 +177,85 @@ def test_exhaustive_draw_settles_tenpai_payments():
     assert result.info["settlement"]["tenpai_seats"] == [0]
     assert result.info["settlement"]["score_deltas"] == [3000, -1000, -1000, -1000]
     assert env.state.scores == [28000, 24000, 24000, 24000]
+
+
+def test_match_advances_to_next_hand_after_non_dealer_ron():
+    match = MahjongMatchEnv(seed=0, max_round_wind=2)
+    match.reset(dealer=3)
+
+    players = _make_empty_players()
+    players[1].tiles = _make_tiles([1, 2, 3, 10, 11, 12, 19, 20, 21, 3, 4, 5, 14])
+    players[0].tiles = _make_tiles([14, 0, 6, 7, 8, 9, 16, 17, 18, 22, 23, 24, 25, 26])
+    players[0].drawn_tile = players[0].tiles[0]
+    players[0].has_drawn_this_turn = True
+    match.hand_env.state = TableState(
+        dealer=3,
+        current_seat=0,
+        phase=Phase.SELF_DECISION,
+        players=players,
+        live_wall=_make_tiles([9, 9, 9]),
+        dead_wall=_make_tiles([9] * 14),
+    )
+    match.state = MatchState(
+        dealer=3,
+        round_wind=0,
+        honba=0,
+        riichi_sticks=0,
+        scores=[25000, 25000, 25000, 25000],
+        hand_index=0,
+        max_round_wind=2,
+        phase=Phase.SELF_DECISION,
+    )
+
+    discard = next(action for action in match.legal_actions() if action.kind == ActionKind.DISCARD and action.tile == 14)
+    match.step(discard)
+    result = match.step(Action(ActionKind.RON, tile=14))
+    assert result.terminated is True
+
+    next_observation = match.advance_hand()
+
+    assert next_observation["match"]["dealer"] == 0
+    assert next_observation["match"]["round_wind"] == 1
+    assert next_observation["match"]["honba"] == 0
+    assert next_observation["match"]["hand_index"] == 1
+    assert next_observation["hand"]["phase"] == "self_decision"
+
+
+def test_match_keeps_dealer_and_honba_after_dealer_tsumo():
+    match = MahjongMatchEnv(seed=0, max_round_wind=2)
+    match.reset(dealer=0)
+
+    players = _make_empty_players()
+    winning_tiles = [1, 2, 3, 10, 11, 12, 19, 20, 21, 3, 4, 5, 14, 14]
+    players[0].tiles = _make_tiles(winning_tiles)
+    players[0].drawn_tile = players[0].tiles[-1]
+    players[0].has_drawn_this_turn = True
+    match.hand_env.state = TableState(
+        dealer=0,
+        current_seat=0,
+        phase=Phase.SELF_DECISION,
+        players=players,
+        live_wall=_make_tiles([6, 7, 8]),
+        dead_wall=_make_tiles([9] * 14),
+    )
+    match.state = MatchState(
+        dealer=0,
+        round_wind=0,
+        honba=0,
+        riichi_sticks=0,
+        scores=[25000, 25000, 25000, 25000],
+        hand_index=0,
+        max_round_wind=2,
+        phase=Phase.SELF_DECISION,
+    )
+
+    result = match.step(next(action for action in match.legal_actions() if action.kind == ActionKind.TSUMO))
+    assert result.terminated is True
+
+    next_observation = match.advance_hand()
+
+    assert next_observation["match"]["dealer"] == 0
+    assert next_observation["match"]["round_wind"] == 0
+    assert next_observation["match"]["honba"] == 1
+    assert next_observation["match"]["hand_index"] == 1
+    assert next_observation["match"]["scores"] == [36700, 21100, 21100, 21100]
