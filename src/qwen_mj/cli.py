@@ -11,7 +11,7 @@ from .experiment import evaluate_against_baseline, run_self_play_experiment
 from .rollout import FirstLegalPolicy, JsonlRolloutLogger, RandomPolicy, play_hand, play_match
 from .environment import MahjongSelfPlayEnv
 from .dataset_validation import validate_sft_jsonl
-from .benchmark import evaluate_model_paths, model_benchmark_result_to_dict, write_model_benchmark_jsonl
+from .benchmark import evaluate_model_paths, load_model_benchmark_jsonl, model_benchmark_result_to_dict, summarize_model_benchmarks, write_model_benchmark_jsonl
 from .experiment import write_experiment_jsonl
 from .inference import InferenceConfig, ModelPolicy, load_model
 from .match import MahjongMatchEnv
@@ -108,6 +108,10 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark_parser.add_argument("--temperature", type=float, default=0.0)
     benchmark_parser.add_argument("--top-p", type=float, default=1.0)
     benchmark_parser.add_argument("--output", type=Path, default=None)
+
+    summarize_benchmark_parser = subparsers.add_parser("summarize-benchmark", help="summarize benchmark JSONL results")
+    summarize_benchmark_parser.add_argument("--input", type=Path, required=True)
+    summarize_benchmark_parser.add_argument("--output", type=Path, default=None)
 
     return parser
 
@@ -304,6 +308,17 @@ def main(argv: list[str] | None = None) -> int:
                 sort_keys=True,
             )
         )
+        return 0
+
+    if args.command == "summarize-benchmark":
+        results = load_model_benchmark_jsonl(args.input)
+        summary = summarize_model_benchmarks(results)
+        payload = asdict(summary)
+        if args.output is not None:
+            with args.output.open("w", encoding="utf-8") as handle:
+                json.dump(payload, handle, ensure_ascii=False, indent=2, sort_keys=True)
+                handle.write("\n")
+        print(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True, default=str))
         return 0
 
     raise ValueError(f"unknown command: {args.command}")

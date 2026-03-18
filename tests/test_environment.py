@@ -4,7 +4,7 @@ from qwen_mj import Action, ActionKind, MahjongMatchEnv, MahjongSelfPlayEnv
 from qwen_mj import FirstLegalPolicy, JsonlRolloutLogger, ObservationEncoder, play_hand, play_match
 from qwen_mj import evaluate_against_baseline, run_self_play_experiment
 from qwen_mj import write_experiment_jsonl
-from qwen_mj import ModelBenchmarkResult, model_benchmark_result_to_dict, write_model_benchmark_jsonl
+from qwen_mj import ModelBenchmarkResult, load_model_benchmark_jsonl, model_benchmark_result_to_dict, summarize_model_benchmarks, write_model_benchmark_jsonl
 from qwen_mj import PromptBuilder, SYSTEM_PROMPT, example_to_dict, write_sft_jsonl
 from qwen_mj import example_to_training_text, load_sft_examples
 from qwen_mj import completion_to_action, normalize_completion
@@ -472,6 +472,19 @@ def test_benchmark_models_help():
     assert "benchmark-models" in completed.stdout
 
 
+def test_summarize_benchmark_help():
+    import subprocess
+
+    completed = subprocess.run(
+        [".venv/bin/python", "-m", "qwen_mj.cli", "summarize-benchmark", "--help"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "summarize-benchmark" in completed.stdout
+
+
 def test_experiment_jsonl_writer(tmp_path):
     summary = run_self_play_experiment(episodes=1, seed=0, max_steps=1)
     path = tmp_path / "experiment.jsonl"
@@ -503,6 +516,21 @@ def test_model_benchmark_writer(tmp_path):
     assert payload["result"]["model_path"] == "model-a"
     assert payload["result"]["summary"]["num_episodes"] == 1
     assert model_benchmark_result_to_dict(result)["metadata"]["tag"] == "x"
+
+
+def test_load_and_summarize_benchmark_jsonl(tmp_path):
+    summary = run_self_play_experiment(episodes=1, seed=0, max_steps=1)
+    result = ModelBenchmarkResult(model_path="model-a", adapter_path=None, baseline="random", summary=summary, metadata={"tag": "x"})
+    path = tmp_path / "bench.jsonl"
+    write_model_benchmark_jsonl([result], path)
+
+    loaded = load_model_benchmark_jsonl(path)
+    summary_payload = summarize_model_benchmarks(loaded)
+
+    assert len(loaded) == 1
+    assert loaded[0].model_path == "model-a"
+    assert summary_payload.num_results == 1
+    assert summary_payload.best_model_path == "model-a"
 
 
 def test_completion_to_action_round_trips_legal_action():

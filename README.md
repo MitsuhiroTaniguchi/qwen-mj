@@ -74,6 +74,12 @@ qwen-mj evaluate-model --episodes 20 --model-path runs/sft/merged --baseline ran
 qwen-mj benchmark-models --model-paths runs/sft/step-100 runs/sft/step-200 --baseline random --output runs/benchmark.jsonl
 ```
 
+保存済み benchmark を再集計する:
+
+```bash
+qwen-mj summarize-benchmark --input runs/benchmark.jsonl --output runs/benchmark-summary.json
+```
+
 ## テスト方針
 
 - まず壊れ方をテストで固定する
