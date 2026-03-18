@@ -43,6 +43,7 @@ This repository builds a Tenhou-rule self-play environment for Qwen3.5-4B.
 - SFT dataset validation for canonical prompt/completion consistency.
 - Inference helpers that map canonical completions back to legal actions.
 - CLI entrypoints for model-backed self-play, evaluation, and dataset validation.
+- Benchmark helper for sweeping multiple checkpoints against the same baseline.
 - Regression tests for reset, discard progression, and a known winning hand.
 
 ## Conservative Areas

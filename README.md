@@ -68,6 +68,12 @@ qwen-mj evaluate-model --episodes 20 --model-path runs/sft/merged --baseline ran
 qwen-mj evaluate-model --episodes 20 --model-path runs/sft/merged --baseline random --output runs/eval.jsonl
 ```
 
+複数 checkpoint をまとめて比較する:
+
+```bash
+qwen-mj benchmark-models --model-paths runs/sft/step-100 runs/sft/step-200 --baseline random --output runs/benchmark.jsonl
+```
+
 ## テスト方針
 
 - まず壊れ方をテストで固定する

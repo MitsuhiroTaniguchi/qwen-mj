@@ -1,4 +1,5 @@
 from .environment import MahjongSelfPlayEnv, TableState
+from .benchmark import ModelBenchmarkResult, evaluate_model_paths, model_benchmark_result_to_dict, write_model_benchmark_jsonl
 from .encoding import EncodedObservation, ObservationEncoder
 from .experiment import EpisodeSummary, ExperimentSummary, aggregate_experiment, evaluate_against_baseline, run_self_play_experiment, summarize_episode, write_experiment_jsonl
 from .dataset_validation import DatasetValidationError, DatasetValidationReport, load_jsonl, validate_sft_example, validate_sft_jsonl
@@ -18,6 +19,7 @@ __all__ = [
     "CanonicalActionCodec",
     "DatasetValidationError",
     "DatasetValidationReport",
+    "ModelBenchmarkResult",
     "InferenceConfig",
     "ModelPolicy",
     "FirstLegalPolicy",
@@ -36,6 +38,7 @@ __all__ = [
     "SFTTrainConfig",
     "aggregate_experiment",
     "evaluate_against_baseline",
+    "evaluate_model_paths",
     "build_training_dataset",
     "Policy",
     "ReactionOpportunity",
@@ -49,6 +52,7 @@ __all__ = [
     "validate_sft_example",
     "validate_sft_jsonl",
     "select_action",
+    "model_benchmark_result_to_dict",
     "Seat",
     "StepResult",
     "SYSTEM_PROMPT",
@@ -58,6 +62,7 @@ __all__ = [
     "summarize_episode",
     "train_sft",
     "write_experiment_jsonl",
+    "write_model_benchmark_jsonl",
     "write_sft_jsonl",
     "play_hand",
     "play_match",

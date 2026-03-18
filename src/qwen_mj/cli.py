@@ -11,6 +11,7 @@ from .experiment import evaluate_against_baseline, run_self_play_experiment
 from .rollout import FirstLegalPolicy, JsonlRolloutLogger, RandomPolicy, play_hand, play_match
 from .environment import MahjongSelfPlayEnv
 from .dataset_validation import validate_sft_jsonl
+from .benchmark import evaluate_model_paths, model_benchmark_result_to_dict, write_model_benchmark_jsonl
 from .experiment import write_experiment_jsonl
 from .inference import InferenceConfig, ModelPolicy, load_model
 from .match import MahjongMatchEnv
@@ -95,6 +96,18 @@ def build_parser() -> argparse.ArgumentParser:
     evaluate_model_parser.add_argument("--temperature", type=float, default=0.0)
     evaluate_model_parser.add_argument("--top-p", type=float, default=1.0)
     evaluate_model_parser.add_argument("--output", type=Path, default=None)
+
+    benchmark_parser = subparsers.add_parser("benchmark-models", help="evaluate multiple model checkpoints")
+    benchmark_parser.add_argument("--model-paths", type=Path, nargs="+", required=True)
+    benchmark_parser.add_argument("--episodes", type=int, default=10)
+    benchmark_parser.add_argument("--seed", type=int, default=0)
+    benchmark_parser.add_argument("--max-steps", type=int, default=10000)
+    benchmark_parser.add_argument("--baseline", choices=["first-legal", "random"], default="random")
+    benchmark_parser.add_argument("--adapter-path", type=Path, default=None)
+    benchmark_parser.add_argument("--max-new-tokens", type=int, default=32)
+    benchmark_parser.add_argument("--temperature", type=float, default=0.0)
+    benchmark_parser.add_argument("--top-p", type=float, default=1.0)
+    benchmark_parser.add_argument("--output", type=Path, default=None)
 
     return parser
 
@@ -266,6 +279,31 @@ def main(argv: list[str] | None = None) -> int:
         if args.output is not None:
             write_experiment_jsonl(summary, args.output)
         print(json.dumps(summary.__dict__, ensure_ascii=False, indent=2, sort_keys=True, default=str))
+        return 0
+
+    if args.command == "benchmark-models":
+        results = evaluate_model_paths(
+            model_paths=args.model_paths,
+            episodes=args.episodes,
+            baseline=args.baseline,
+            seed=args.seed,
+            adapter_path=args.adapter_path,
+            max_steps=args.max_steps,
+            encoder=encoder,
+            max_new_tokens=args.max_new_tokens,
+            temperature=args.temperature,
+            top_p=args.top_p,
+        )
+        if args.output is not None:
+            write_model_benchmark_jsonl(results, args.output)
+        print(
+            json.dumps(
+                [model_benchmark_result_to_dict(result) for result in results],
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+            )
+        )
         return 0
 
     raise ValueError(f"unknown command: {args.command}")
