@@ -1,0 +1,15 @@
+.DS_Store
+__pycache__/
+.pytest_cache/
+.venv/
+venv/
+env/
+*.pyc
+*.pyo
+*.pyd
+*.log
+checkpoints/
+outputs/
+runs/
+wandb/
+*.sqlite3
