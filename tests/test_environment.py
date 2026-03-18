@@ -485,6 +485,19 @@ def test_summarize_benchmark_help():
     assert "summarize-benchmark" in completed.stdout
 
 
+def test_train_rl_help():
+    import subprocess
+
+    completed = subprocess.run(
+        [".venv/bin/python", "-m", "qwen_mj.cli", "train-rl", "--help"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "train-rl" in completed.stdout
+
+
 def test_benchmark_renderers_return_text():
     summary = run_self_play_experiment(episodes=1, seed=0, max_steps=1)
     result = ModelBenchmarkResult(model_path="model-a", adapter_path=None, baseline="random", summary=summary, metadata={"tag": "x"})

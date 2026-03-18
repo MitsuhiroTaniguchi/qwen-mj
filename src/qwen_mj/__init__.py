@@ -8,6 +8,18 @@ from .match import MahjongMatchEnv, MatchState
 from .rollout import FirstLegalPolicy, JsonlRolloutLogger, Policy, RandomPolicy, play_hand, play_match
 from .training_data import CanonicalActionCodec, PromptBuilder, SFTExample, SYSTEM_PROMPT, example_to_dict, write_sft_jsonl
 from .train_sft import SFTTrainConfig, build_training_dataset, example_to_training_text, load_sft_examples, train_sft
+
+try:  # pragma: no cover - optional dependency surface
+    from .train_rl import RLExperience, RLIterationSummary, RLTrainConfig, collect_rl_experiences, load_baseline_policy, train_rl
+except ModuleNotFoundError as exc:  # pragma: no cover - optional dependency surface
+    if exc.name != "torch":
+        raise
+    RLExperience = None  # type: ignore[assignment]
+    RLIterationSummary = None  # type: ignore[assignment]
+    RLTrainConfig = None  # type: ignore[assignment]
+    collect_rl_experiences = None  # type: ignore[assignment]
+    load_baseline_policy = None  # type: ignore[assignment]
+    train_rl = None  # type: ignore[assignment]
 from .types import Action, ActionKind, Meld, Phase, PlayerState, ReactionOpportunity, Seat, StepResult, Tile, TileInstance, Transition, WinEvent
 from .rules import PyMahjongRulesAdapter
 
@@ -38,11 +50,15 @@ __all__ = [
     "PromptBuilder",
     "load_jsonl",
     "SFTTrainConfig",
+    "RLExperience",
+    "RLIterationSummary",
+    "RLTrainConfig",
     "aggregate_experiment",
     "evaluate_against_baseline",
     "evaluate_model_paths",
     "load_model_benchmark_jsonl",
     "build_training_dataset",
+    "collect_rl_experiences",
     "Policy",
     "ReactionOpportunity",
     "RandomPolicy",
@@ -63,8 +79,10 @@ __all__ = [
     "SYSTEM_PROMPT",
     "example_to_dict",
     "load_sft_examples",
+    "load_baseline_policy",
     "run_self_play_experiment",
     "summarize_episode",
+    "train_rl",
     "train_sft",
     "write_experiment_jsonl",
     "write_model_benchmark_jsonl",

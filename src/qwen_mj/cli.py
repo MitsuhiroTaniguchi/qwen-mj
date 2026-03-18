@@ -70,6 +70,31 @@ def build_parser() -> argparse.ArgumentParser:
     train_parser.add_argument("--lora-dropout", type=float, default=0.0)
     train_parser.add_argument("--save-method", choices=["lora", "merged_16bit"], default="lora")
 
+    rl_parser = subparsers.add_parser("train-rl", help="train a Qwen model with self-play policy gradients")
+    rl_parser.add_argument("--output-dir", type=Path, required=True)
+    rl_parser.add_argument("--model-name", default="Qwen/Qwen3.5-4B-Instruct")
+    rl_parser.add_argument("--max-seq-length", type=int, default=4096)
+    rl_parser.add_argument("--iterations", type=int, default=1)
+    rl_parser.add_argument("--episodes-per-iteration", type=int, default=8)
+    rl_parser.add_argument("--max-steps", type=int, default=10000)
+    rl_parser.add_argument("--learning-rate", type=float, default=1e-5)
+    rl_parser.add_argument("--reward-scale", type=float, default=1000.0)
+    rl_parser.add_argument("--center-advantages", action="store_true", default=True)
+    rl_parser.add_argument("--no-center-advantages", action="store_false", dest="center_advantages")
+    rl_parser.add_argument("--reward-normalization", action="store_true", default=True)
+    rl_parser.add_argument("--no-reward-normalization", action="store_false", dest="reward_normalization")
+    rl_parser.add_argument("--seed", type=int, default=0)
+    rl_parser.add_argument("--lora-r", type=int, default=16)
+    rl_parser.add_argument("--lora-alpha", type=int, default=16)
+    rl_parser.add_argument("--lora-dropout", type=float, default=0.0)
+    rl_parser.add_argument("--save-method", choices=["lora", "merged_16bit"], default="lora")
+    rl_parser.add_argument("--baseline", choices=["first-legal", "random"], default="random")
+    rl_parser.add_argument("--temperature", type=float, default=0.8)
+    rl_parser.add_argument("--top-p", type=float, default=1.0)
+    rl_parser.add_argument("--max-new-tokens", type=int, default=32)
+    rl_parser.add_argument("--save-every", type=int, default=1)
+    rl_parser.add_argument("--clip-grad-norm", type=float, default=1.0)
+
     validate_parser = subparsers.add_parser("validate-dataset", help="validate an SFT JSONL dataset")
     validate_parser.add_argument("--dataset", type=Path, required=True)
     validate_parser.add_argument("--max-errors", type=int, default=20)
@@ -210,6 +235,41 @@ def main(argv: list[str] | None = None) -> int:
         )
         summary = train_sft(config)
         print(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True))
+        return 0
+
+    if args.command == "train-rl":
+        try:
+            from .train_rl import RLTrainConfig, train_rl
+        except ModuleNotFoundError as exc:
+            if exc.name == "torch":
+                raise RuntimeError("train-rl requires torch and the training dependencies") from exc
+            raise
+
+        config = RLTrainConfig(
+            output_dir=args.output_dir,
+            model_name=args.model_name,
+            max_seq_length=args.max_seq_length,
+            iterations=args.iterations,
+            episodes_per_iteration=args.episodes_per_iteration,
+            max_steps=args.max_steps,
+            learning_rate=args.learning_rate,
+            reward_scale=args.reward_scale,
+            center_advantages=args.center_advantages,
+            reward_normalization=args.reward_normalization,
+            seed=args.seed,
+            lora_r=args.lora_r,
+            lora_alpha=args.lora_alpha,
+            lora_dropout=args.lora_dropout,
+            save_method=args.save_method,
+            baseline=args.baseline,
+            temperature=args.temperature,
+            top_p=args.top_p,
+            max_new_tokens=args.max_new_tokens,
+            save_every=args.save_every,
+            clip_grad_norm=args.clip_grad_norm,
+        )
+        summary = train_rl(config)
+        print(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True, default=str))
         return 0
 
     if args.command == "validate-dataset":

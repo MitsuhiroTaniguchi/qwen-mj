@@ -42,6 +42,12 @@ Unsloth で SFT を回す:
 qwen-mj train-sft --dataset data/sft.jsonl --output-dir runs/sft
 ```
 
+自己対戦 RL を回す:
+
+```bash
+qwen-mj train-rl --output-dir runs/rl --iterations 1 --episodes-per-iteration 8
+```
+
 学習前にデータを検査する:
 
 ```bash
