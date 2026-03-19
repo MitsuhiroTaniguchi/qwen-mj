@@ -70,19 +70,32 @@ def build_parser() -> argparse.ArgumentParser:
     train_parser.add_argument("--lora-dropout", type=float, default=0.0)
     train_parser.add_argument("--save-method", choices=["lora", "merged_16bit"], default="lora")
 
-    rl_parser = subparsers.add_parser("train-rl", help="train a Qwen model with self-play policy gradients")
+    rl_parser = subparsers.add_parser("train-rl", help="train a Qwen model with self-play PPO")
     rl_parser.add_argument("--output-dir", type=Path, required=True)
     rl_parser.add_argument("--model-name", default="Qwen/Qwen3.5-4B-Instruct")
     rl_parser.add_argument("--max-seq-length", type=int, default=4096)
     rl_parser.add_argument("--iterations", type=int, default=1)
     rl_parser.add_argument("--episodes-per-iteration", type=int, default=8)
     rl_parser.add_argument("--max-steps", type=int, default=10000)
+    rl_parser.add_argument("--batch-size", type=int, default=1)
+    rl_parser.add_argument("--grad-accumulation", type=int, default=4)
     rl_parser.add_argument("--learning-rate", type=float, default=1e-5)
+    rl_parser.add_argument("--value-learning-rate", type=float, default=None)
     rl_parser.add_argument("--reward-scale", type=float, default=1000.0)
     rl_parser.add_argument("--center-advantages", action="store_true", default=True)
     rl_parser.add_argument("--no-center-advantages", action="store_false", dest="center_advantages")
     rl_parser.add_argument("--reward-normalization", action="store_true", default=True)
     rl_parser.add_argument("--no-reward-normalization", action="store_false", dest="reward_normalization")
+    rl_parser.add_argument("--gamma", type=float, default=1.0)
+    rl_parser.add_argument("--gae-lambda", type=float, default=0.95)
+    rl_parser.add_argument("--ppo-epochs", type=int, default=2)
+    rl_parser.add_argument("--minibatch-size", type=int, default=None)
+    rl_parser.add_argument("--clip-epsilon", type=float, default=0.2)
+    rl_parser.add_argument("--value-clip-epsilon", type=float, default=0.2)
+    rl_parser.add_argument("--value-loss-coef", type=float, default=0.5)
+    rl_parser.add_argument("--entropy-coef", type=float, default=0.01)
+    rl_parser.add_argument("--target-kl", type=float, default=0.05)
+    rl_parser.add_argument("--no-target-kl", action="store_const", const=None, dest="target_kl")
     rl_parser.add_argument("--seed", type=int, default=0)
     rl_parser.add_argument("--lora-r", type=int, default=16)
     rl_parser.add_argument("--lora-alpha", type=int, default=16)
@@ -94,6 +107,8 @@ def build_parser() -> argparse.ArgumentParser:
     rl_parser.add_argument("--max-new-tokens", type=int, default=32)
     rl_parser.add_argument("--save-every", type=int, default=1)
     rl_parser.add_argument("--clip-grad-norm", type=float, default=1.0)
+    rl_parser.add_argument("--log-jsonl", action="store_true", default=True)
+    rl_parser.add_argument("--no-log-jsonl", action="store_false", dest="log_jsonl")
 
     validate_parser = subparsers.add_parser("validate-dataset", help="validate an SFT JSONL dataset")
     validate_parser.add_argument("--dataset", type=Path, required=True)
@@ -252,10 +267,22 @@ def main(argv: list[str] | None = None) -> int:
             iterations=args.iterations,
             episodes_per_iteration=args.episodes_per_iteration,
             max_steps=args.max_steps,
+            per_device_train_batch_size=args.batch_size,
+            gradient_accumulation_steps=args.grad_accumulation,
             learning_rate=args.learning_rate,
+            value_learning_rate=args.value_learning_rate,
             reward_scale=args.reward_scale,
             center_advantages=args.center_advantages,
             reward_normalization=args.reward_normalization,
+            gamma=args.gamma,
+            gae_lambda=args.gae_lambda,
+            ppo_epochs=args.ppo_epochs,
+            minibatch_size=args.minibatch_size or args.batch_size,
+            clip_epsilon=args.clip_epsilon,
+            value_clip_epsilon=args.value_clip_epsilon,
+            value_loss_coef=args.value_loss_coef,
+            entropy_coef=args.entropy_coef,
+            target_kl=args.target_kl,
             seed=args.seed,
             lora_r=args.lora_r,
             lora_alpha=args.lora_alpha,
@@ -267,6 +294,7 @@ def main(argv: list[str] | None = None) -> int:
             max_new_tokens=args.max_new_tokens,
             save_every=args.save_every,
             clip_grad_norm=args.clip_grad_norm,
+            log_jsonl=args.log_jsonl,
         )
         summary = train_rl(config)
         print(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True, default=str))

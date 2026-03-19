@@ -13,6 +13,7 @@ from qwen_mj import InferenceConfig, ModelPolicy, select_action
 from qwen_mj.environment import TableState
 from qwen_mj.match import MatchState
 from qwen_mj.types import Phase, PlayerState, TileInstance
+from qwen_mj.cli import build_parser
 
 
 def _make_tiles(tile_ids: list[int]) -> list[TileInstance]:
@@ -496,6 +497,23 @@ def test_train_rl_help():
     )
 
     assert "train-rl" in completed.stdout
+    assert "--ppo-epochs" in completed.stdout
+    assert "--gae-lambda" in completed.stdout
+    assert "--entropy-coef" in completed.stdout
+
+
+def test_train_rl_parser_exposes_ppo_defaults():
+    parser = build_parser()
+    args = parser.parse_args(["train-rl", "--output-dir", "runs/rl"])
+
+    assert args.batch_size == 1
+    assert args.grad_accumulation == 4
+    assert args.ppo_epochs == 2
+    assert args.minibatch_size is None
+    assert args.gae_lambda == 0.95
+    assert args.entropy_coef == 0.01
+    assert args.target_kl == 0.05
+    assert args.log_jsonl is True
 
 
 def test_benchmark_renderers_return_text():

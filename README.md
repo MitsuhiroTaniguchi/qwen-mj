@@ -4,7 +4,7 @@ Qwen3.5-4B を麻雀の自己対戦環境で学習・評価するための実験
 
 ## 目的
 
-- Unsloth を使った LoRA / RL 学習の検証
+- Unsloth を使った LoRA / SFT / PPO 学習の検証
 - 自己対戦による方策改善の確認
 - 固定ベースラインに対する強さの測定
 
@@ -42,11 +42,13 @@ Unsloth で SFT を回す:
 qwen-mj train-sft --dataset data/sft.jsonl --output-dir runs/sft
 ```
 
-自己対戦 RL を回す:
+自己対戦 PPO を回す:
 
 ```bash
-qwen-mj train-rl --output-dir runs/rl --iterations 1 --episodes-per-iteration 8
+qwen-mj train-rl --output-dir runs/rl --iterations 1 --episodes-per-iteration 8 --ppo-epochs 2 --gae-lambda 0.95 --entropy-coef 0.01
 ```
+
+RL の履歴は既定で `runs/rl/rl_history.jsonl` に保存される。
 
 学習前にデータを検査する:
 

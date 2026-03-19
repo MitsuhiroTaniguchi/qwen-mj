@@ -10,13 +10,15 @@ from .training_data import CanonicalActionCodec, PromptBuilder, SFTExample, SYST
 from .train_sft import SFTTrainConfig, build_training_dataset, example_to_training_text, load_sft_examples, train_sft
 
 try:  # pragma: no cover - optional dependency surface
-    from .train_rl import RLExperience, RLIterationSummary, RLTrainConfig, collect_rl_experiences, load_baseline_policy, train_rl
+    from .train_rl import PPOBatchMetrics, RLExperience, RLIterationSummary, RLTrainConfig, ValueHead, collect_rl_experiences, load_baseline_policy, train_rl
 except ModuleNotFoundError as exc:  # pragma: no cover - optional dependency surface
     if exc.name != "torch":
         raise
+    PPOBatchMetrics = None  # type: ignore[assignment]
     RLExperience = None  # type: ignore[assignment]
     RLIterationSummary = None  # type: ignore[assignment]
     RLTrainConfig = None  # type: ignore[assignment]
+    ValueHead = None  # type: ignore[assignment]
     collect_rl_experiences = None  # type: ignore[assignment]
     load_baseline_policy = None  # type: ignore[assignment]
     train_rl = None  # type: ignore[assignment]
@@ -50,6 +52,7 @@ __all__ = [
     "PromptBuilder",
     "load_jsonl",
     "SFTTrainConfig",
+    "PPOBatchMetrics",
     "RLExperience",
     "RLIterationSummary",
     "RLTrainConfig",
@@ -93,5 +96,6 @@ __all__ = [
     "Tile",
     "TileInstance",
     "Transition",
+    "ValueHead",
     "WinEvent",
 ]
